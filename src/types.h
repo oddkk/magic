@@ -99,4 +99,13 @@ V3i(i32 x, i32 y, i32 z) { return (v3i) {.x = x, .y = y, .z = z}; }
 static inline v4i
 V4i(i32 x, i32 y, i32 z, i32 w) { return (v4i) {.x = x, .y = y, .z = z, .w = w}; }
 
+static inline v2f
+v2_add(v2 lhs, v2 rhs) { lhs.x += rhs.x; lhs.y += rhs.y; return lhs; }
+
+static inline v3f
+v3_add(v3 lhs, v3 rhs) { lhs.x += rhs.x; lhs.y += rhs.y; lhs.z += rhs.z; return lhs; }
+
+static inline v4f
+v4_add(v4 lhs, v4 rhs) { lhs.x += rhs.x; lhs.y += rhs.y; lhs.z += rhs.z; lhs.w += rhs.w; return lhs; }
+
 #endif

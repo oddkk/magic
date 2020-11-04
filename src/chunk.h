@@ -5,6 +5,7 @@
 #include "tile.h"
 #include "math.h"
 
+/*
 // Tiles are hexagons, while chunks are diamond-shaped to fit together in the
 // same manner as the tiles.
 //
@@ -22,21 +23,31 @@
 //        z z z     w w w
 //         z z       w w
 //          z         w
+*/
+
+
+
 
 #define CHUNK_WIDTH 16
-#define CHUNK_HEIGHT 1
-#define CHUNK_TILES (CHUNK_WIDTH*CHUNK_WIDTH*CHUNK_HEIGHT)
+#define CHUNK_HEIGHT 16
+#define CHUNK_LAYER_NUM_TILES (CHUNK_WIDTH*CHUNK_WIDTH)
+#define CHUNK_NUM_TILES (CHUNK_LAYER_NUM_TILES*CHUNK_HEIGHT)
+
+_Static_assert(CHUNK_LAYER_NUM_TILES % (sizeof(u64)*8) == 0, "Layer size must be a multiple of 64.");
+_Static_assert((sizeof(u64)*8) % CHUNK_WIDTH == 0, "Layer width must be a multiple of 64.");
 
 typedef struct mgc_chunk_t {
-	// The abstraction level of the chunk. For level 0 each tile equals one
-	// block. For for level n, n > 0, each tile equals one chunk of level n-1.
-	unsigned int level;
-
-	// The chunk's location in world coordinates for its level.
+	// The chunk's location in world coordinates.
 	v3i location;
 
-	Tile tiles[CHUNK_TILES];
-	struct mgc_chunk_t **childChunks;
+	// column-major
+	Tile tiles[CHUNK_NUM_TILES];
 } Chunk;
+
+size_t
+chunkCoordToIndex(v3i coord);
+
+Tile *
+chunkTile(Chunk *, v3i localCoord);
 
 #endif

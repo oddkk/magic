@@ -3,9 +3,11 @@
 #include "math.h"
 #include "color.h"
 #include "intdef.h"
+#include "utils.h"
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 GLuint compileShader(char *shaderCode, size_t codeLength, GLenum type) {
 	GLuint shader;
@@ -38,7 +40,7 @@ GLuint compileShader(char *shaderCode, size_t codeLength, GLenum type) {
 	return shader;
 }
 
-static GLuint
+GLuint
 compileShaderFromFile(const char *file, GLenum type)
 {
 	FILE *fp = fopen(file, "rb");
@@ -277,4 +279,455 @@ renderChunk(RenderContext *ctx, Camera cam, Chunk *chunk)
 
 		}
 	}
+}
+
+typedef enum {
+	NEIGHBOUR_NW    = 0,
+	NEIGHBOUR_NE    = 1,
+	NEIGHBOUR_W     = 2,
+	NEIGHBOUR_E     = 3,
+	NEIGHBOUR_SW    = 4,
+	NEIGHBOUR_SE    = 5,
+	NEIGHBOUR_ABOVE = 6,
+	NEIGHBOUR_BELOW = 7,
+} LayerNeighbourName;
+
+typedef enum {
+	NEIGHBOUR_MASK_NW    = (1<<NEIGHBOUR_NW),
+	NEIGHBOUR_MASK_NE    = (1<<NEIGHBOUR_NE),
+	NEIGHBOUR_MASK_W     = (1<<NEIGHBOUR_W),
+	NEIGHBOUR_MASK_E     = (1<<NEIGHBOUR_E),
+	NEIGHBOUR_MASK_SW    = (1<<NEIGHBOUR_SW),
+	NEIGHBOUR_MASK_SE    = (1<<NEIGHBOUR_SE),
+	NEIGHBOUR_MASK_ABOVE = (1<<NEIGHBOUR_ABOVE),
+	NEIGHBOUR_MASK_BELOW = (1<<NEIGHBOUR_BELOW),
+} LayerNeighbourNameMask;
+
+
+#define LAYER_MASK_UNITS ((CHUNK_LAYER_NUM_TILES + (sizeof(u64)*8)-1) / (sizeof(u64)*8))
+typedef struct {
+	u8 layerId;
+	u64 nw[LAYER_MASK_UNITS];
+	u64 ne[LAYER_MASK_UNITS];
+	u64 w[LAYER_MASK_UNITS];
+	u64 e[LAYER_MASK_UNITS];
+	u64 sw[LAYER_MASK_UNITS];
+	u64 se[LAYER_MASK_UNITS];
+
+	u64 above[LAYER_MASK_UNITS];
+	u64 below[LAYER_MASK_UNITS];
+} LayerNeighbours;
+
+void
+chunkLayerCullMask(u8 *cullMask, LayerNeighbours *neighbours)
+{
+	for (size_t i = 0; i < CHUNK_LAYER_NUM_TILES; i++) {
+		size_t maskUnitIdx = i / (sizeof(u64)*8);
+		size_t maskSubUnitIdx = i % (sizeof(u64)*8);
+		// [nw, ne, w, e, sw, se, above, below] for each tile.
+#define CULL_MASK_FROM_NEIGHBOUR(cullIdx, nMask) ((!!((nMask[maskUnitIdx]) & (1 << maskSubUnitIdx))) << cullIdx)
+		cullMask[i] =
+			  CULL_MASK_FROM_NEIGHBOUR(NEIGHBOUR_NW,    neighbours->nw)
+			| CULL_MASK_FROM_NEIGHBOUR(NEIGHBOUR_NE,    neighbours->ne)
+			| CULL_MASK_FROM_NEIGHBOUR(NEIGHBOUR_W,     neighbours->w)
+			| CULL_MASK_FROM_NEIGHBOUR(NEIGHBOUR_E,     neighbours->e)
+			| CULL_MASK_FROM_NEIGHBOUR(NEIGHBOUR_SW,    neighbours->sw)
+			| CULL_MASK_FROM_NEIGHBOUR(NEIGHBOUR_SE,    neighbours->se)
+			| CULL_MASK_FROM_NEIGHBOUR(NEIGHBOUR_ABOVE, neighbours->above)
+			| CULL_MASK_FROM_NEIGHBOUR(NEIGHBOUR_BELOW, neighbours->below);
+#undef CULL_MASK_FROM_NEIGHBOUR
+	}
+}
+
+/*
+static void
+printTileLayerMask(u64 *mask)
+{
+	const size_t bitsPerUnit = sizeof(u64)*8;
+
+	for (size_t z = 0; z < CHUNK_WIDTH; z++) {
+		for (size_t i = 0; i < CHUNK_WIDTH-(z+1); i++) {
+			printf(" ");
+		}
+		for (size_t x = 0; x < CHUNK_WIDTH; x++) {
+			size_t idx = x + z * CHUNK_WIDTH;
+			u64 unit = mask[idx / bitsPerUnit];
+			bool set = !!((1ULL << (idx % bitsPerUnit)) & unit);
+			printf("%c ", set ? '#' : '.');
+		}
+		printf("\n");
+	}
+}
+*/
+
+const char *boxDrawing[] = {
+	"▖",
+	"▗",
+	"▘",
+	"▝",
+
+	/*
+	" ",
+	"▏",
+	"▕",
+	"▔",
+	"▁",
+	*/
+};
+
+static void
+printTileLayerCullMask(u8 *mask)
+{
+	for (size_t z = 0; z < CHUNK_WIDTH; z++) {
+		for (size_t i = 0; i < CHUNK_WIDTH-(z+1); i++) {
+			printf(" ");
+		}
+		for (size_t x = 0; x < CHUNK_WIDTH; x++) {
+			size_t idx = x + z * CHUNK_WIDTH;
+			u8 unit = mask[idx];
+			printf("%02x ", unit);
+		}
+		printf("\n");
+	}
+}
+
+static inline u64
+tilesMaskMove(u64 *mask, size_t i, i64 movement)
+{
+	u64 base = mask[i];
+	const size_t bitsPerUnit = (sizeof(u64)*8);
+	if (movement >= 0) {
+		const size_t unitsPerLayer = CHUNK_LAYER_NUM_TILES / bitsPerUnit;
+		u64 high = (i < (unitsPerLayer-1)) ? mask[i+1] : 0;
+		u64 result = ((base >> movement) | (high << (bitsPerUnit - movement)));
+		return result;
+	} else {
+		movement = -movement;
+		u64 low = (i > 0) ? mask[i-1] : 0;
+		u64 result = ((base << movement) | (low >> (bitsPerUnit - movement)));
+		return result;
+	}
+}
+
+size_t
+u8CountSetBits(u8 v)
+{
+	size_t count = 0;
+	while (v) {
+		count += v & 1;
+		v >>= 1;
+	}
+	return count;
+}
+
+Mesh
+chunkGenMesh(MaterialTable *materials, Chunk *cnk)
+{
+	const size_t bitsPerUnit = sizeof(u64)*8;
+
+	// We assume the number of tiles is a multiple of 64.
+	u64 *solidMask;
+	solidMask = calloc(sizeof(u64), CHUNK_NUM_TILES / bitsPerUnit);
+
+	// [nw, ne, w, e, sw, se, above, below] for each tile.
+	u8 *cullMask = calloc(sizeof(u8), 8*CHUNK_NUM_TILES);
+
+	LayerNeighbours *neighbourMasks = calloc(sizeof(LayerNeighbours), 3);
+
+	for (size_t i = 0; i < CHUNK_NUM_TILES; i++) {
+		Tile *tile = &cnk->tiles[i];
+		Material *mat = getMaterial(materials, tile->material);
+		solidMask[i/bitsPerUnit] |= (mat->solid ? 1ULL : 0ULL) << (i % bitsPerUnit);
+	}
+
+	LayerNeighbours *prev, *curr, *next;
+	prev = &neighbourMasks[0];
+	curr = &neighbourMasks[1];
+	next = &neighbourMasks[2];
+
+	for (size_t y = 0; y < CHUNK_HEIGHT; y++) {
+		u64 *layerSolidMask = &solidMask[y*CHUNK_LAYER_NUM_TILES/bitsPerUnit];
+
+		for (size_t i = 0; i < CHUNK_LAYER_NUM_TILES / bitsPerUnit; i++) {
+			prev->above[i] |= layerSolidMask[i];
+			next->below[i] |= layerSolidMask[i];
+
+#if CHUNK_WIDTH == 16
+			const u64 eastEdgeMask = ~(
+				(1ULL << (16*1-1)) |
+				(1ULL << (16*2-1)) |
+				(1ULL << (16*3-1)) |
+				(1ULL << (16*4-1))
+			);
+			const u64 westEdgeMask = ~(
+				(1ULL << (16*0)) |
+				(1ULL << (16*1)) |
+				(1ULL << (16*2)) |
+				(1ULL << (16*3))
+			);
+#endif
+
+			curr->w[i]  |= tilesMaskMove(layerSolidMask, i,  1) & eastEdgeMask;
+			curr->e[i]  |= tilesMaskMove(layerSolidMask, i, -1) & westEdgeMask;
+			curr->nw[i] |= tilesMaskMove(layerSolidMask, i,  CHUNK_WIDTH-1);
+			curr->ne[i] |= tilesMaskMove(layerSolidMask, i,  CHUNK_WIDTH-0);
+			curr->sw[i] |= tilesMaskMove(layerSolidMask, i, -CHUNK_WIDTH-1);
+			curr->se[i] |= tilesMaskMove(layerSolidMask, i, -CHUNK_WIDTH-0);
+		}
+
+		if (y > 0) {
+			u8 *prevLayerCullMask = &cullMask[(y-1)*CHUNK_LAYER_NUM_TILES];
+			chunkLayerCullMask(prevLayerCullMask, prev);
+		}
+
+		LayerNeighbours *newLayer = prev;
+		memset(newLayer, 0, sizeof(LayerNeighbours));
+		newLayer->layerId = y + 1;
+
+		prev = curr;
+		curr = next;
+		next = newLayer;
+	}
+
+	u8 *lastLayerCullMask = &cullMask[(CHUNK_HEIGHT-1)*CHUNK_LAYER_NUM_TILES];
+	chunkLayerCullMask(lastLayerCullMask, prev);
+
+	printTileLayerCullMask(lastLayerCullMask);
+
+	size_t numTriangles = 0;
+	for (size_t i = 0; i < CHUNK_NUM_TILES; i++) {
+		bool solid = !!(solidMask[i / bitsPerUnit] & (1ULL << (i % bitsPerUnit)));
+		if (!solid) {
+			continue;
+		}
+
+		// The two top-most bits indicate if the top and bottom surfaces should
+		// be drawn. These faces require 4 triangles instead of the 2 the sides
+		// need.
+		u8 visibleFaces = ~cullMask[i];
+		u8 quadFaces = visibleFaces & 0xc0;
+		u8 hexFaces  = visibleFaces & 0x3f;
+
+		numTriangles += u8CountSetBits(quadFaces >> 6) * 4;
+		numTriangles += u8CountSetBits(hexFaces)       * 2;
+
+		// numTriangles += (quadFaces || hexFaces) ? 2 : 0;
+	}
+
+	const f32 xOffset = cos(30.0 * M_PI / 180.0) * hexR;
+	const f32 yOffset = sin(30.0 * M_PI / 180.0) * hexR;
+
+	const v3 hexVerts[] = {
+		V3(0.0f,     hexH,  hexR),
+		V3(xOffset,  hexH,  yOffset),
+		V3(xOffset,  hexH, -yOffset),
+		V3(0.0f,     hexH, -hexR),
+		V3(-xOffset, hexH, -yOffset),
+		V3(-xOffset, hexH,  yOffset),
+
+		V3(0.0f,     0.0f,  hexR),
+		V3(xOffset,  0.0f,  yOffset),
+		V3(xOffset,  0.0f, -yOffset),
+		V3(0.0f,     0.0f, -hexR),
+		V3(-xOffset, 0.0f, -yOffset),
+		V3(-xOffset, 0.0f,  yOffset),
+	};
+
+	v3 *vertices = calloc(sizeof(v3), 3 * numTriangles);
+	size_t vertI = 0;
+	for (size_t i = 0; i < CHUNK_NUM_TILES; i++) {
+		bool solid = !!(solidMask[i / bitsPerUnit] & (1ULL << (i % bitsPerUnit)));
+		if (!solid || cullMask[i] == 0xff) {
+			continue;
+		}
+
+		v3i coord = V3i(
+			i % CHUNK_WIDTH,
+			i / CHUNK_LAYER_NUM_TILES,
+			(i % CHUNK_LAYER_NUM_TILES) / CHUNK_WIDTH
+		);
+		v3 center = V3(
+			coord.x * hexStrideX + coord.z * hexStaggerX,
+			coord.y * hexH,
+			coord.z * hexStrideY
+		);
+
+		u8 visibleMask = ~cullMask[i];
+
+#define EMIT_HEX_TRIANGLE(i0, i1, i2) \
+			vertices[vertI+0] = v3_add(center, hexVerts[i0]); \
+			vertices[vertI+1] = v3_add(center, hexVerts[i1]); \
+			vertices[vertI+2] = v3_add(center, hexVerts[i2]); \
+			vertI += 3;
+
+#define FLAG_SET(v, flag) ((v & flag) != 0)
+		/*
+		if (FLAG_SET(visibleMask, NEIGHBOUR_MASK_NW)) {
+			EMIT_HEX_TRIANGLE(5, 6, 11);
+			EMIT_HEX_TRIANGLE(5, 0,  6);
+		}
+		*/
+
+		if (FLAG_SET(visibleMask, NEIGHBOUR_MASK_NE)) {
+			EMIT_HEX_TRIANGLE(0, 7, 6);
+			EMIT_HEX_TRIANGLE(0, 1, 7);
+		}
+
+		if (FLAG_SET(visibleMask, NEIGHBOUR_MASK_W)) {
+			EMIT_HEX_TRIANGLE(4, 11, 10);
+			EMIT_HEX_TRIANGLE(4,  5, 11);
+		}
+
+		if (FLAG_SET(visibleMask, NEIGHBOUR_MASK_E)) {
+			EMIT_HEX_TRIANGLE(1, 8, 7);
+			EMIT_HEX_TRIANGLE(1, 2, 8);
+		}
+
+		if (FLAG_SET(visibleMask, NEIGHBOUR_MASK_SW)) {
+			EMIT_HEX_TRIANGLE(3, 10,  9);
+			EMIT_HEX_TRIANGLE(3,  4, 10);
+		}
+
+		if (FLAG_SET(visibleMask, NEIGHBOUR_MASK_SE)) {
+			EMIT_HEX_TRIANGLE(2, 9, 8);
+			EMIT_HEX_TRIANGLE(2, 3, 9);
+		}
+
+		if (FLAG_SET(visibleMask, NEIGHBOUR_MASK_ABOVE)) {
+			EMIT_HEX_TRIANGLE(0, 5, 1);
+			EMIT_HEX_TRIANGLE(1, 4, 2);
+			EMIT_HEX_TRIANGLE(1, 5, 4);
+			EMIT_HEX_TRIANGLE(2, 4, 3);
+		}
+
+		if (FLAG_SET(visibleMask, NEIGHBOUR_MASK_BELOW)) {
+			EMIT_HEX_TRIANGLE(6,  7, 11);
+			EMIT_HEX_TRIANGLE(7,  8, 10);
+			EMIT_HEX_TRIANGLE(7, 10, 11);
+			EMIT_HEX_TRIANGLE(8,  9, 10);
+		}
+
+		// EMIT_HEX_TRIANGLE(0, 3, 2);
+		// EMIT_HEX_TRIANGLE(0, 4, 3);
+
+		/*
+		if (FLAG_SET(visibleMask, NEIGHBOUR_MASK_ABOVE)) {
+			EMIT_HEX_TRIANGLE(0, 2, 1);
+			EMIT_HEX_TRIANGLE(0, 3, 2);
+			EMIT_HEX_TRIANGLE(0, 4, 3);
+			EMIT_HEX_TRIANGLE(0, 5, 4);
+		}
+
+		if (FLAG_SET(visibleMask, NEIGHBOUR_MASK_BELOW)) {
+			EMIT_HEX_TRIANGLE(6,  7,  8);
+			EMIT_HEX_TRIANGLE(6,  8,  9);
+			EMIT_HEX_TRIANGLE(6,  9, 10);
+			EMIT_HEX_TRIANGLE(6, 10, 11);
+		}
+		*/
+#undef FLAG_SET
+	}
+	// assert(vertI == 3 * numTriangles);
+
+#undef EMIT_HEX_TRIANGLE
+
+	free(solidMask);
+	free(cullMask);
+	free(neighbourMasks);
+
+	Mesh mesh = {0};
+
+	// mesh.numVertices = 3 * numTriangles;
+	mesh.numVertices = vertI;
+
+	glGenVertexArrays(1, &mesh.vao);
+	glGenBuffers(1, &mesh.vbo);
+
+	glBindVertexArray(mesh.vao);
+	glBindBuffer(GL_ARRAY_BUFFER, mesh.vbo);
+
+	glBufferData(GL_ARRAY_BUFFER, numTriangles * 3 * sizeof(v3), vertices, GL_STATIC_DRAW);
+
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(0);
+
+	glBindVertexArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+	free(vertices);
+
+	/*
+	v3 vertecies[] = {
+		V3(0.0f,     hexH, hexR),
+		V3(xOffset,  hexH, yOffset),
+		V3(xOffset,  hexH, -yOffset),
+		V3(0.0f,     hexH, -hexR),
+		V3(-xOffset, hexH, -yOffset),
+		V3(-xOffset, hexH,  yOffset),
+
+		V3(0.0f,     0.0f, hexR),
+		V3(xOffset,  0.0f, yOffset),
+		V3(xOffset,  0.0f, -yOffset),
+		V3(0.0f,     0.0f, -hexR),
+		V3(-xOffset, 0.0f, -yOffset),
+		V3(-xOffset, 0.0f,  yOffset),
+	};
+
+	u32 elements[] = {
+		// Top
+		0,  2,  1,
+		0,  3,  2,
+		0,  4,  3,
+		0,  5,  4,
+
+		// Bottom
+		6,  7,  8,
+		6,  8,  9,
+		6,  9, 10,
+		6, 10, 11,
+
+		// Sides
+		0,  7,  6,
+		0,  1,  7,
+              
+		1,  8,  7,
+		1,  2,  8,
+              
+		2,  9,  8,
+		2,  3,  9,
+              
+		3, 10,  9,
+		3,  4, 10,
+              
+		4, 11, 10,
+		4,  5, 11,
+              
+		5,  6, 11,
+		5,  0,  6,
+	};
+
+	Mesh mesh = {0};
+
+	mesh.veoLength = sizeof(elements) / sizeof(u32);
+
+	glGenVertexArrays(1, &mesh.vao);
+	glGenBuffers(1, &mesh.vbo);
+	glGenBuffers(1, &mesh.veo);
+
+	glBindVertexArray(mesh.vao);
+	glBindBuffer(GL_ARRAY_BUFFER, mesh.vbo);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.veo);
+
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertecies), vertecies, GL_STATIC_DRAW);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(elements), elements, GL_STATIC_DRAW);
+
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(0);
+
+	glBindVertexArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+	*/
+
+	return mesh;
 }

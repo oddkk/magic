@@ -93,26 +93,102 @@ int main(int argc, char *argv[])
 	Camera cam = {0};
 
 	cam.zoom = 0.5f;
-	cam.location.x = 8.0f;
-	cam.location.y = 8.0f;
+	cam.location = V3(2.0f, 2.0f, 2.0f);
 
-	for (size_t i = 0; i < CHUNK_WIDTH*CHUNK_WIDTH; i++) {
-		chunk.tiles[i].material = MAT_WATER;
+	for (size_t i = 0; i < CHUNK_WIDTH*CHUNK_WIDTH*CHUNK_HEIGHT; i++) {
+		// chunk.tiles[i].material = (i%2 == 0) ? MAT_WOOD : MAT_AIR;
+		// chunk.tiles[i].material = MAT_WOOD;
+		chunk.tiles[i].material = MAT_AIR;
 	}
 
-	/*
-	for (size_t i = 0; i < CHUNK_WIDTH*CHUNK_WIDTH; i++) {
-		chunk.tiles[i] = 
-			tileTransition(&materialTable, &chunk.tiles[i], NULL, 0);
+	chunk.tiles[1].material = MAT_WOOD;
+	chunk.tiles[3].material = MAT_WOOD;
+
+	GLuint defaultVShader, defaultFShader;
+	defaultVShader = compileShaderFromFile("assets/shaders/default.vsh", GL_VERTEX_SHADER);
+	defaultFShader = compileShaderFromFile("assets/shaders/default.fsh", GL_FRAGMENT_SHADER);
+
+	GLuint defaultShader;
+	defaultShader = glCreateProgram();
+
+	glAttachShader(defaultShader, defaultVShader);
+	glAttachShader(defaultShader, defaultFShader);
+	if (!linkShaderProgram(defaultShader)) {
+		return -1;
 	}
-	*/
+
+	GLint inCameraTransform, inWorldLocation, inColor;
+	inCameraTransform = glGetUniformLocation(defaultShader, "cameraTransform");
+	inWorldLocation = glGetUniformLocation(defaultShader, "worldLocation");
+	inColor = glGetUniformLocation(defaultShader, "inColor");
+
+	Mesh chunkMesh = chunkGenMesh(&materialTable, &chunk);
+
+	glEnable(GL_CULL_FACE);
+	glFrontFace(GL_CCW);
+	glCullFace(GL_FRONT);
 
 	signal(SIGINT, signalHandler);
 
+	int tick = 0;
+
 	while (!glfwWindowShouldClose(win) && !shouldQuit) {
+		tick += 1;
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		renderChunk(&winCtx.render, cam, &chunk);
+		int width, height;
+		glfwGetWindowSize(win, &width, &height);
+
+		m4 perspective;
+		mat4_identity(perspective.m);
+		mat4_perspective(
+				perspective.m, to_radians(90.0f),
+				(float)width / (float)height, 0.1f, 100.0f);
+
+		v3 chunkCenter = V3(
+			0.0f, 0.0f, 0.0f
+			// 8.0f * hexStrideX + 8.0f * hexStaggerX,
+			// 0,
+			// 8.0f * hexStrideY
+		);
+
+		cam.location = v3_add(chunkCenter, V3(
+			// 8.0f, 16.0f, 0.0f
+			cos(((float)tick / 480.0f) * 2 * M_PI) * 10.0f,
+			8.0f,
+			sin(((float)tick / 480.0f) * 2 * M_PI) * 10.0f
+		));
+
+		v3 lookAt = chunkCenter;
+		v3 up = V3(0.0f, 1.0f, 0.0f);
+		m4 camera;
+		mat4_look_at(camera.m, cam.location.m, lookAt.m, up.m);
+
+		m4 cameraTransform;
+		mat4_multiply(cameraTransform.m, perspective.m, camera.m);
+
+		glUseProgram(defaultShader);
+		glBindVertexArray(chunkMesh.vao);
+
+		v3 chunkLocation = V3(
+			0.0f,
+			0.0f,
+			0.0f
+		);
+
+		glUniform3fv(inWorldLocation, 1, chunkLocation.m);
+		glUniformMatrix4fv(inCameraTransform, 1, GL_TRUE, cameraTransform.m);
+
+		glLineWidth(1.0f);
+		// glDrawElements(
+		// 		GL_TRIANGLES, chunkMesh.veoLength,
+		// 		GL_UNSIGNED_INT, NULL);
+
+		glUniform3f(inColor, 1.0f, 1.0f, 1.0f);
+
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+		glDrawArrays(GL_TRIANGLES, 0, chunkMesh.numVertices);
 
 		glfwSwapBuffers(win);
 		glfwPollEvents();

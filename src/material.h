@@ -59,6 +59,7 @@ typedef enum {
 typedef struct {
 	String name;
 	Color color;
+	bool solid;
 } Material;
 
 typedef struct {

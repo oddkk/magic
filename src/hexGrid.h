@@ -4,6 +4,10 @@
 #include <math.h>
 #include "math.h"
 
+// Height
+static const float hexH = 0.2;
+
+// Radius
 static const float hexR = 0.5;
 extern float hexStrideX;
 extern float hexStrideY;

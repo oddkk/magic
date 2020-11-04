@@ -18,4 +18,7 @@ typedef mfloat_t m3[MAT3_SIZE];
 typedef mfloat_t m4[MAT4_SIZE];
 */
 
+void
+m4Print(m4 *);
+
 #endif

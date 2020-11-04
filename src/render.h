@@ -6,9 +6,15 @@
 #include "math.h"
 
 typedef struct {
-	v2 location;
+	v3 location;
 	float zoom;
 } Camera;
+
+typedef struct {
+	GLuint vao, vbo; //, veo;
+	// u32 veoLength;
+	u32 numVertices;
+} Mesh;
 
 typedef struct {
 	struct {
@@ -45,7 +51,19 @@ renderInitialize(RenderContext *);
 void
 renderTeardown(RenderContext *);
 
+GLuint
+compileShader(char *shaderCode, size_t codeLength, GLenum type);
+
+GLuint
+compileShaderFromFile(const char *file, GLenum type);
+
+bool
+linkShaderProgram(GLuint program);
+
 void
 renderChunk(RenderContext *ctx, Camera cam, Chunk *chunk);
+
+Mesh
+chunkGenMesh(MaterialTable *, Chunk *);
 
 #endif

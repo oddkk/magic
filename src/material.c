@@ -22,10 +22,10 @@ ActionType defaultActionTypes[] = {
 };
 
 Material defaultMaterials[] = {
-	[MAT_AIR]   = { STR("air"),   COLOR_HEX(0x000000) },
-	[MAT_WATER] = { STR("water"), COLOR_HEX(0x0000ff) },
-	[MAT_WOOD]  = { STR("wood"),  COLOR_HEX(0x804000) },
-	[MAT_METAL] = { STR("metal"), COLOR_HEX(0xd3d3d3) },
+	[MAT_AIR]   = { STR("air"),   COLOR_HEX(0x000000), false },
+	[MAT_WATER] = { STR("water"), COLOR_HEX(0x0000ff), true },
+	[MAT_WOOD]  = { STR("wood"),  COLOR_HEX(0x804000), true },
+	[MAT_METAL] = { STR("metal"), COLOR_HEX(0xd3d3d3), true },
 };
 
 MaterialTrait defaultMaterialTraits[] = {
