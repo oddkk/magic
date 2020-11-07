@@ -96,13 +96,8 @@ int main(int argc, char *argv[])
 	cam.location = V3(2.0f, 2.0f, 2.0f);
 
 	for (size_t i = 0; i < CHUNK_WIDTH*CHUNK_WIDTH*CHUNK_HEIGHT; i++) {
-		// chunk.tiles[i].material = (i%2 == 0) ? MAT_WOOD : MAT_AIR;
-		// chunk.tiles[i].material = MAT_WOOD;
-		chunk.tiles[i].material = MAT_AIR;
+		chunk.tiles[i].material = MAT_WOOD;
 	}
-
-	chunk.tiles[1].material = MAT_WOOD;
-	chunk.tiles[3].material = MAT_WOOD;
 
 	GLuint defaultVShader, defaultFShader;
 	defaultVShader = compileShaderFromFile("assets/shaders/default.vsh", GL_VERTEX_SHADER);
@@ -143,17 +138,18 @@ int main(int argc, char *argv[])
 		mat4_identity(perspective.m);
 		mat4_perspective(
 				perspective.m, to_radians(90.0f),
-				(float)width / (float)height, 0.1f, 100.0f);
+				(float)width / (float)height,
+				0.1f, 100.0f);
 
 		v3 chunkCenter = V3(
-			0.0f, 0.0f, 0.0f
-			// 8.0f * hexStrideX + 8.0f * hexStaggerX,
-			// 0,
-			// 8.0f * hexStrideY
+			// 0.0f, 0.0f, 0.0f
+			8.0f * hexStrideX + 8.0f * hexStaggerX,
+			0,
+			8.0f * hexStrideY
 		);
 
 		cam.location = v3_add(chunkCenter, V3(
-			// 8.0f, 16.0f, 0.0f
+			// 0.0f, 8.0f, 10.0f
 			cos(((float)tick / 480.0f) * 2 * M_PI) * 10.0f,
 			8.0f,
 			sin(((float)tick / 480.0f) * 2 * M_PI) * 10.0f
@@ -180,13 +176,10 @@ int main(int argc, char *argv[])
 		glUniformMatrix4fv(inCameraTransform, 1, GL_TRUE, cameraTransform.m);
 
 		glLineWidth(1.0f);
-		// glDrawElements(
-		// 		GL_TRIANGLES, chunkMesh.veoLength,
-		// 		GL_UNSIGNED_INT, NULL);
 
 		glUniform3f(inColor, 1.0f, 1.0f, 1.0f);
 
-		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+		// glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
 		glDrawArrays(GL_TRIANGLES, 0, chunkMesh.numVertices);
 

@@ -15,5 +15,4 @@ FLAGS+=" -Ivendor/mathc"
 # FLAGS="$FLAGS -fsanitize=address -fno-omit-frame-pointer"
 
 echo "Compiling"
-echo $CC -g -std=gnu11 -Wall -pedantic -lm -ldl -lglfw -pthread $FLAGS ${SRC[*]} -o magic
 $CC -g -std=gnu11 -Wall -pedantic -lm -ldl -lglfw -pthread $FLAGS ${SRC[*]} -o magic || exit
