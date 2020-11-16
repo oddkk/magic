@@ -1,8 +1,12 @@
 #version 450
 
 layout(location=0) in vec3 inVec;
+layout(location=1) in vec3 inNormal;
+
 uniform mat4 cameraTransform;
 uniform vec3 worldLocation;
+
+out vec3 normal;
 
 mat4 matTranslate(vec3 v) {
 	return mat4(
@@ -14,5 +18,6 @@ mat4 matTranslate(vec3 v) {
 }
 
 void main() {
+	normal = inNormal;
 	gl_Position = vec4(inVec, 1.0) * matTranslate(worldLocation) * cameraTransform;
 }

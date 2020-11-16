@@ -540,6 +540,9 @@ chunkGenMesh(MaterialTable *materials, Chunk *cnk)
 		numTriangles += u8CountSetBits(hexFaces)       * 2;
 	}
 
+	const f32 normalX = sin(30.0 * M_PI / 180.0);
+	const f32 normalY = cos(30.0 * M_PI / 180.0);
+
 	const f32 xOffset = cos(30.0 * M_PI / 180.0) * hexR;
 	const f32 yOffset = sin(30.0 * M_PI / 180.0) * hexR;
 
@@ -559,7 +562,7 @@ chunkGenMesh(MaterialTable *materials, Chunk *cnk)
 		V3(-xOffset, 0.0f,  yOffset),
 	};
 
-	v3 *vertices = calloc(sizeof(v3), 3 * numTriangles);
+	v3 *vertices = calloc(sizeof(v3), 3*2 * numTriangles);
 	size_t vertI = 0;
 	for (size_t i = 0; i < CHUNK_NUM_TILES; i++) {
 		bool solid = !!(solidMask[i / bitsPerUnit] & (1ULL << (i % bitsPerUnit)));
@@ -582,42 +585,52 @@ chunkGenMesh(MaterialTable *materials, Chunk *cnk)
 
 #define EMIT_HEX_TRIANGLE(i0, i1, i2) \
 			vertices[vertI+0] = v3_add(center, hexVerts[i0]); \
-			vertices[vertI+1] = v3_add(center, hexVerts[i1]); \
-			vertices[vertI+2] = v3_add(center, hexVerts[i2]); \
-			vertI += 3;
+			vertices[vertI+1] = normal; \
+			vertices[vertI+2] = v3_add(center, hexVerts[i1]); \
+			vertices[vertI+3] = normal; \
+			vertices[vertI+4] = v3_add(center, hexVerts[i2]); \
+			vertices[vertI+5] = normal; \
+			vertI += 6;
 
 #define FLAG_SET(v, flag) ((v & flag) != 0)
 		if (FLAG_SET(visibleMask, NEIGHBOUR_MASK_NW)) {
+			v3 normal = V3(-normalX,  0.0f, normalY);
 			EMIT_HEX_TRIANGLE(5, 6, 11);
 			EMIT_HEX_TRIANGLE(5, 0,  6);
 		}
 
 		if (FLAG_SET(visibleMask, NEIGHBOUR_MASK_NE)) {
+			v3 normal = V3(normalX,  0.0f, normalY);
 			EMIT_HEX_TRIANGLE(0, 7, 6);
 			EMIT_HEX_TRIANGLE(0, 1, 7);
 		}
 
 		if (FLAG_SET(visibleMask, NEIGHBOUR_MASK_W)) {
+			v3 normal = V3(-1.0f,  0.0f,  0.0f);
 			EMIT_HEX_TRIANGLE(4, 11, 10);
 			EMIT_HEX_TRIANGLE(4,  5, 11);
 		}
 
 		if (FLAG_SET(visibleMask, NEIGHBOUR_MASK_E)) {
+			v3 normal = V3( 1.0f,  0.0f,  0.0f);
 			EMIT_HEX_TRIANGLE(1, 8, 7);
 			EMIT_HEX_TRIANGLE(1, 2, 8);
 		}
 
 		if (FLAG_SET(visibleMask, NEIGHBOUR_MASK_SW)) {
+			v3 normal = V3(-normalX,  0.0f, -normalY);
 			EMIT_HEX_TRIANGLE(3, 10,  9);
 			EMIT_HEX_TRIANGLE(3,  4, 10);
 		}
 
 		if (FLAG_SET(visibleMask, NEIGHBOUR_MASK_SE)) {
+			v3 normal = V3(normalX,  0.0f, -normalY);
 			EMIT_HEX_TRIANGLE(2, 9, 8);
 			EMIT_HEX_TRIANGLE(2, 3, 9);
 		}
 
 		if (FLAG_SET(visibleMask, NEIGHBOUR_MASK_ABOVE)) {
+			v3 normal = V3( 0.0f,  1.0f,  0.0f);
 			EMIT_HEX_TRIANGLE(0, 5, 1);
 			EMIT_HEX_TRIANGLE(1, 4, 2);
 			EMIT_HEX_TRIANGLE(1, 5, 4);
@@ -625,6 +638,7 @@ chunkGenMesh(MaterialTable *materials, Chunk *cnk)
 		}
 
 		if (FLAG_SET(visibleMask, NEIGHBOUR_MASK_BELOW)) {
+			v3 normal = V3( 0.0f, -1.0f,  0.0f);
 			EMIT_HEX_TRIANGLE(6,  7, 11);
 			EMIT_HEX_TRIANGLE(7,  8, 10);
 			EMIT_HEX_TRIANGLE(7, 10, 11);
@@ -632,7 +646,7 @@ chunkGenMesh(MaterialTable *materials, Chunk *cnk)
 		}
 #undef FLAG_SET
 	}
-	assert(vertI == 3 * numTriangles);
+	assert(vertI == (3+3) * numTriangles);
 
 #undef EMIT_HEX_TRIANGLE
 
@@ -650,10 +664,12 @@ chunkGenMesh(MaterialTable *materials, Chunk *cnk)
 	glBindVertexArray(mesh.vao);
 	glBindBuffer(GL_ARRAY_BUFFER, mesh.vbo);
 
-	glBufferData(GL_ARRAY_BUFFER, numTriangles * 3 * sizeof(v3), vertices, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, numTriangles * 2*3*sizeof(v3), vertices, GL_STATIC_DRAW);
 
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 2*sizeof(v3), 0);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 2*sizeof(v3), (void*)(sizeof(v3)));
 	glEnableVertexAttribArray(0);
+	glEnableVertexAttribArray(1);
 
 	glBindVertexArray(0);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);

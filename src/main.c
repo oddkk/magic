@@ -123,6 +123,8 @@ int main(int argc, char *argv[])
 	glFrontFace(GL_CCW);
 	glCullFace(GL_FRONT);
 
+	glEnable(GL_DEPTH_TEST);
+
 	signal(SIGINT, signalHandler);
 
 	int tick = 0;

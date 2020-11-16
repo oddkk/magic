@@ -1,0 +1,56 @@
+Shapes
+======
+
+Shapes are a set of cells. There are operations that can produce and combine
+shapes. Shapes in themselves does not carry any information, other than being
+present or not. Such information is assigned when the shape is placed into an
+area together with information about materials.
+
+## Shape groups
+
+Shapes can be unioned in a shape group.
+```
+shape [translate=<translation: vec3>] [rotate=<rotation: int>] {
+	<shape: shape>...
+}
+```
+
+If only one shape is present:
+```
+shape [translate=<translation: vec3>] [rotate=<rotation: int>] <shape: shape>
+```
+
+## Variables
+
+Variables can be assigned using `=`.
+
+```
+Var1 = cell (0, 0, 0);
+Var2 = shape {
+	cell (0, 0, 0);
+	cell (1, 0, 0);
+};
+
+Var3 = (1, 0, 1);
+Var4 = 5;
+```
+
+## Shape producing operators
+
+### `cell [[coord=]<coordinate: vec3>]`
+`cell` selects a single cell at a specific coordinate.
+
+### `heightmap [file=]<file: path> [[coord=]<coordinate: vec3>]`
+`heightmap` selects a set of cells based on a topology map.
+
+### `cube <p0: vec3> <p1: vec3>`
+`cube` selects a cube of cells bounded by p0 and p1.
+
+### `hexagon [radius=]<center: vec3> [radius=]<radius: int> [[height=]<h: int>]
+`hexagon` selects a hexagonal plane with a given radius and a given height.
+
+### `perlin ...`
+todo
+
+
+## Shape
