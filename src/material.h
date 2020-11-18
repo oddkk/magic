@@ -20,7 +20,7 @@ typedef enum {
 } DeafultTraitTypes;
 
 typedef struct {
-	String name;
+	struct string name;
 } TraitType;
 
 typedef enum {
@@ -30,7 +30,7 @@ typedef enum {
 } DeafultStatusTypes;
 
 typedef struct {
-	String name;
+	struct string name;
 } StatusType;
 
 typedef struct {
@@ -44,7 +44,7 @@ typedef enum {
 } DeafultActionTypes;
 
 typedef struct {
-	String name;
+	struct string name;
 } ActionType;
 
 typedef enum {
@@ -57,7 +57,7 @@ typedef enum {
 } DeafultMaterialTypes;
 
 typedef struct {
-	String name;
+	struct string name;
 	Color color;
 	bool solid;
 } Material;

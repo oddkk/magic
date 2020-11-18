@@ -4,14 +4,14 @@
 #include "str.h"
 #include "arena.h"
 
-typedef struct atom {
-	stg_hash hash;
+struct atom {
+	mgc_hash hash;
 	struct string name;
 	struct atom *next_in_bucket;
-} Atom;
+};
 
 struct atom_page;
-typedef struct atom_table {
+struct atom_table {
 	struct arena *string_arena;
 	struct atom_page *first_page;
 	struct atom_page *last_page;
@@ -20,15 +20,15 @@ typedef struct atom_table {
 
 	size_t num_buckets;
 	struct atom **buckets;
-} AtomTable;
+};
 
-Atom *atom_create(AtomTable *table, struct string name);
+struct atom *atom_create(struct atom_table *table, struct string name);
 
-void atom_table_rehash(AtomTable *table, size_t new_num_buckets);
+void atom_table_rehash(struct atom_table *table, size_t new_num_buckets);
 
-void atom_table_print(AtomTable *table);
+void atom_table_print(struct atom_table *table);
 
-void atom_table_destroy(AtomTable *table);
+void atom_table_destroy(struct atom_table *table);
 
 #define ALIT_NONE_LABEL "(none)"
 

@@ -2,6 +2,7 @@
 #include "utils.h"
 #include "murmurhash.h"
 #include <stdlib.h>
+#include <stdio.h>
 
 #define atom_page_capacity (10)
 
@@ -17,8 +18,8 @@ static void atom_table_insert(struct atom_table *table, struct atom *new_atom)
 
 	current = &table->buckets[new_atom->hash.val[0] % table->num_buckets];
 
-	while (*current && stg_hash_lte((*current)->hash, new_atom->hash)) {
-		if (stg_hash_eq((*current)->hash, new_atom->hash)) {
+	while (*current && mgc_hash_lte((*current)->hash, new_atom->hash)) {
+		if (mgc_hash_eq((*current)->hash, new_atom->hash)) {
 			if (string_equal(new_atom->name, (*current)->name)) {
 				break;
 			}
@@ -62,13 +63,13 @@ struct atom *atom_create(struct atom_table *table, struct string name)
 {
 	assert(table);
 	assert(name.text);
-	stg_hash name_hash = stg_hash_string(name);
+	mgc_hash name_hash = mgc_hash_string(name);
 	struct atom **current;
 
 	current = &table->buckets[name_hash.val[0] % table->num_buckets];
 
-	while (*current && stg_hash_lte((*current)->hash, name_hash)) {
-		if (stg_hash_eq((*current)->hash, name_hash)) {
+	while (*current && mgc_hash_lte((*current)->hash, name_hash)) {
+		if (mgc_hash_eq((*current)->hash, name_hash)) {
 			if (string_equal(name, (*current)->name)) {
 				return *current;
 			}
