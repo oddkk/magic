@@ -8,6 +8,8 @@
 #include "render.h"
 #include "intdef.h"
 
+#include "world_def.h"
+
 static bool shouldQuit = false;
 
 void
@@ -47,6 +49,72 @@ int main(int argc, char *argv[])
 		printf("Failed to initialize glfw.\n");
 		return -1;
 	}
+
+	struct mgc_memory memory = {0};
+	mgc_memory_init(&memory);
+
+	struct arena arena = {0};
+	arena_init(&arena, &memory);
+
+	struct arena tmp_arena = {0};
+	arena_init(&tmp_arena, &memory);
+
+	struct mgc_error_context err_ctx = {0};
+	err_ctx.string_arena = &arena;
+	err_ctx.transient_arena = &tmp_arena;
+
+	struct atom_table atom_table = {0};
+	atom_table.string_arena = &arena;
+	atom_table_rehash(&atom_table, 64);
+
+	struct mgcd_world world = {0};
+	mgcd_world_init(&world, &memory);
+
+	struct mgcd_context parse_ctx = {0};
+	mgcd_context_init(
+			&parse_ctx,
+			&world,
+			&atom_table,
+			&arena,
+			&tmp_arena,
+			&err_ctx);
+
+	struct mgcd_lexer lexer = {0};
+	mcgd_parse_open_file(
+			&lexer,
+			&parse_ctx,
+			"./assets/world/test.shape");
+
+	struct mgcd_shape_file test_shape_file;
+	mgcd_parse_shape_file(&parse_ctx, &lexer, &test_shape_file);
+
+	print_errors(&err_ctx);
+
+	mgcd_print_shape_file(&test_shape_file);
+
+	/*
+	struct mgcd_token token;
+	token = mgcd_read_token(&lexer);
+
+	if (token.type != MGCD_TOK_VERSION) {
+		printf("Missing version identifier.\n");
+		return -1;
+	}
+
+	struct mgcd_parser parser = {0};
+	mgcd_parse_init(&parser, &parse_ctx, &lexer);
+
+	struct mgcd_shape_op *op;
+	op = mgcd_parse_shape_op(&parser);
+	mgcd_shape_op_print(op);
+
+	while (token.type != MGCD_TOK_EOF) {
+		token = mgcd_read_token(&lexer);
+		mgcd_print_token(&token);
+	}
+	*/
+
+	return 0;
 
 	hexGridInitialize();
 
@@ -190,4 +258,6 @@ int main(int argc, char *argv[])
 	}
 
 	signal(SIGINT, SIG_DFL);
+
+	mgc_memory_destroy(&memory);
 }

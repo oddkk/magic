@@ -37,17 +37,19 @@ Var4 = 5;
 
 ## Shape producing operators
 
-### `cell [[coord=]<coordinate: vec3>]`
+### `cell <coordinate: vec3>`
 `cell` selects a single cell at a specific coordinate.
 
-### `heightmap [file=]<file: path> [[coord=]<coordinate: vec3>]`
+### `heightmap <file: path> [<coordinate: vec3>]`
 `heightmap` selects a set of cells based on a topology map.
 
 ### `cube <p0: vec3> <p1: vec3>`
 `cube` selects a cube of cells bounded by p0 and p1.
 
-### `hexagon [radius=]<center: vec3> [radius=]<radius: int> [[height=]<h: int>]
+### `hexagon <center: vec3> <radius: int> [<h: int>]
 `hexagon` selects a hexagonal plane with a given radius and a given height.
+
+### `between <s1: shape> , <s2: shape>
 
 ### `perlin ...`
 todo

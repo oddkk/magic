@@ -108,4 +108,50 @@ v3_add(v3 lhs, v3 rhs) { lhs.x += rhs.x; lhs.y += rhs.y; lhs.z += rhs.z; return 
 static inline v4f
 v4_add(v4 lhs, v4 rhs) { lhs.x += rhs.x; lhs.y += rhs.y; lhs.z += rhs.z; lhs.w += rhs.w; return lhs; }
 
+struct mgc_aabbi {
+	v3i min, max;
+};
+
+struct mgc_aabbi
+mgc_aabbi_from_extents(v3i p0, v3i p1);
+
+struct mgc_aabbi
+mgc_aabbi_from_point(v3i p);
+
+struct mgc_aabbi
+mgc_aabbi_extend_bounds(struct mgc_aabbi lhs, struct mgc_aabbi rhs);
+
+struct mgc_aabbi
+mgc_aabbi_intersect_bounds(struct mgc_aabbi lhs, struct mgc_aabbi rhs);
+
+#if 0
+#define max(a, b) \
+	({ __typeof__ (a) _a = (a); \
+	   __typeof__ (b) _b = (b); \
+	   _a > _b ? _a : _b; })
+
+#define min(a, b) \
+	({ __typeof__ (a) _a = (a); \
+	   __typeof__ (b) _b = (b); \
+	   _a < _b ? _a : _b; })
+#endif
+
+#define max(a, b) \
+	_Pragma("GCC diagnostic push") \
+	_Pragma("GCC diagnostic ignored \"-Wgnu-statement-expression\"") \
+	_Pragma("GCC diagnostic ignored \"-Wgnu-auto-type\"") \
+	({ __auto_type __a = (a); \
+	   __auto_type __b = (b); \
+	   __a > __b ? __a : __b; }) \
+	_Pragma("GCC diagnostic pop")
+
+#define min(a, b) \
+	_Pragma("GCC diagnostic push") \
+	_Pragma("GCC diagnostic ignored \"-Wgnu-statement-expression\"") \
+	_Pragma("GCC diagnostic ignored \"-Wgnu-auto-type\"") \
+	({ __typeof__ (a) _a = (a); \
+	   __typeof__ (b) _b = (b); \
+	   _a < _b ? _a : _b; }) \
+	_Pragma("GCC diagnostic pop")
+
 #endif
