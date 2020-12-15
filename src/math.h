@@ -1,24 +1,22 @@
 #ifndef MATH_H
 #define MATH_H
 
-#include <mathc.h>
 #include "types.h"
-
-/*
-typedef mfloat_t v2[VEC2_SIZE];
-typedef mfloat_t v3[VEC3_SIZE];
-typedef mfloat_t v4[VEC4_SIZE];
-
-typedef mint_t v2i[VEC2_SIZE];
-typedef mint_t v3i[VEC3_SIZE];
-typedef mint_t v4i[VEC4_SIZE];
-
-typedef mfloat_t m2[MAT2_SIZE];
-typedef mfloat_t m3[MAT3_SIZE];
-typedef mfloat_t m4[MAT4_SIZE];
-*/
+#include <mathc.h>
 
 void
-m4Print(m4 *);
+v4i_print(v4i *);
+
+void
+m4i_print(m4i *m);
+
+void
+m4_print(m4 *);
+
+int *
+vec4i_multiply_mat4(int *result, int *v0, int *m);
+
+m4i *
+mat4_hex_rotate(m4i *result, int rotation);
 
 #endif
