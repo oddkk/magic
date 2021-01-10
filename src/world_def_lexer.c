@@ -104,6 +104,7 @@ mcgd_parse_open_file(
 		return -1;
 	}
 
+	lex->ctx = ctx;
 	lex->mem = ctx->mem;
 	lex->atom_table = ctx->atom_table;
 	lex->buf = arena_alloc(lex->mem, LEX_BUFFER_SIZE + LEX_BUFFER_MAX_FILL);
@@ -443,13 +444,26 @@ mgcd_read_token(struct mgcd_lexer *ctx)
 					token.ident = atom_create(ctx->atom_table, token_string);
 					return token;
 
-				} else if (char_is_num(c)) {
+				} else if (char_is_num(c) || c == '-') {
+					int sign = 1;
+					if (c == '-') {
+						sign = -1;
+						c = mgcd_eat_n_char(ctx, 1);
+						if (!char_is_num(c)) {
+							mgc_error(ctx->ctx->err, MGC_NO_LOC,
+									"Expected number after '-'.");
+							// TODO: Error handeling (error token)
+							should_continue = true;
+							continue;
+						}
+					}
+
 					struct string int_string;
 					int_string = mgcd_eat_word_num(ctx);
 
 					struct mgcd_token token = {0};
 					token.type = MGCD_TOK_INTEGER_LIT;
-					token.integer_lit = string_to_int64_base10(int_string);
+					token.integer_lit = string_to_int64_base10(int_string) * sign;
 					return token;
 
 				} else if (char_is_any_whitespace(c)) {
@@ -460,7 +474,8 @@ mgcd_read_token(struct mgcd_lexer *ctx)
 		}
 	}
 
-	printf("Unexpected character %c (%i)\n", c, c);
+	mgc_error(ctx->ctx->err, MGC_NO_LOC,
+			"Unexpected character %c (%i)", c, c);
 	struct mgcd_token eof_token = {0};
 	eof_token.type = MGCD_TOK_EOF;
 	return eof_token;

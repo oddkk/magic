@@ -50,11 +50,11 @@ vec4i_multiply_mat4(int *result, int *v0, int *m0)
 	return result;
 }
 
-// Rotate 60deg * rotation
+// Rotate 60deg * rotation. The coordinates are expected to be in
+// cube-cordinate space. (x, y, -x-y)
 m4i *
 mat4_hex_rotate(m4i *result, int rotation)
 {
-
 	// Matrix for rotating 60 degrees clockwise.
 	//  0, -1,  0, 0,
 	//  0,  0, -1, 0,

@@ -36,13 +36,14 @@
 _Static_assert(CHUNK_LAYER_NUM_TILES % (sizeof(u64)*8) == 0, "Layer size must be a multiple of 64.");
 _Static_assert((sizeof(u64)*8) % CHUNK_WIDTH == 0, "Layer width must be a multiple of 64.");
 
-typedef struct {
+struct mgc_chunk {
 	// The chunk's location in world coordinates.
 	v3i location;
 
 	// column-major
 	Tile tiles[CHUNK_NUM_TILES];
-} Chunk;
+};
+typedef struct mgc_chunk Chunk;
 
 size_t
 chunkCoordToIndex(v3i coord);

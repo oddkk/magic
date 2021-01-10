@@ -1,4 +1,16 @@
 #include "types.h"
+#include <string.h>
+
+m4i *
+m4i_identity(m4i *m)
+{
+	memset(m->m, 0, sizeof(int) * 4*4);
+	m->c00 = 1;
+	m->c11 = 1;
+	m->c22 = 1;
+	m->c33 = 1;
+	return m;
+}
 
 struct mgc_aabbi
 mgc_aabbi_from_extents(v3i p0, v3i p1)
@@ -69,5 +81,21 @@ mgc_aabbi_intersect_bounds(struct mgc_aabbi lhs, struct mgc_aabbi rhs)
 	result.max.y = min(lhs.max.y, rhs.max.y);
 	result.max.z = min(lhs.max.z, rhs.max.z);
 
+	return result;
+}
+
+struct mgc_hexbounds
+mgc_hexbounds_union(struct mgc_hexbounds lhs, struct mgc_hexbounds rhs)
+{
+	struct mgc_hexbounds result = {0};
+	// TODO
+	return result;
+}
+
+struct mgc_hexbounds
+mgc_hexbounds_intersect(struct mgc_hexbounds lhs, struct mgc_hexbounds rhs)
+{
+	struct mgc_hexbounds result = {0};
+	// TODO
 	return result;
 }

@@ -5,6 +5,7 @@
 #include "atom.h"
 #include "str.h"
 #include "errors.h"
+#include "shape.h"
 #include <stdio.h>
 
 typedef int mgcd_shape_id;
@@ -16,7 +17,6 @@ typedef int mgcd_var_id;
 enum mgcd_shape_op_kind {
 	MGCD_SHAPE_SHAPE,
 	MGCD_SHAPE_CELL,
-	MGCD_SHAPE_CUBE,
 	MGCD_SHAPE_HEXAGON,
 	MGCD_SHAPE_HEIGHTMAP,
 	MGCD_SHAPE_BETWEEN,
@@ -52,8 +52,10 @@ MGCD_DEF_VAR_TYPES
 	};
 };
 
+struct mgcd_scope;
+
 #define TYPE(name, type) \
-	type mgcd_var_value_##name(struct mgcd_var_##type); \
+	type mgcd_var_value_##name(struct mgcd_scope *, struct mgcd_var_##type); \
 	struct mgcd_var_##type mgcd_var_lit_##name(type); \
 	struct mgcd_var_##type mgcd_var_var_##name(mgcd_var_id);
 MGCD_DEF_VAR_TYPES
@@ -66,7 +68,7 @@ mgcd_type_name(enum mgcd_type);
 
 struct mgcd_shape_op {
 	struct mgcd_shape_op *next;
-	enum mgcd_shape_op_kind kind;
+	enum mgcd_shape_op_kind op;
 	bool inverted;
 
 	union {
@@ -115,7 +117,6 @@ struct mgcd_var_def {
 
 struct mgcd_shape {
 	struct mgcd_shape_op *ops;
-	size_t num_ops;
 
 	struct mgcd_var_def *vars;
 	size_t num_vars;
@@ -133,7 +134,6 @@ mgcd_world_init(struct mgcd_world *world, struct mgc_memory *mem);
 	ATOM(shape) \
 	ATOM(cell) \
 	ATOM(heightmap) \
-	ATOM(cube) \
 	ATOM(hexagon) \
 	ATOM(between) \
 	ATOM(coord) \
@@ -252,7 +252,7 @@ mgcd_parse_shape_op(struct mgcd_parser *);
 
 struct mgcd_shape_file {
 	struct mgcd_version version;
-	struct mgcd_shape_op *ops;
+	struct mgcd_shape shape;
 };
 
 bool
@@ -263,5 +263,11 @@ mgcd_parse_shape_file(
 
 void
 mgcd_print_shape_file(struct mgcd_shape_file *file);
+
+bool
+mgcd_complete_shape(struct mgcd_context *,
+		struct mgcd_shape *shape,
+		struct arena *mem,
+		struct mgc_shape *out_shape);
 
 #endif

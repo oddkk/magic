@@ -473,6 +473,17 @@ chunkGenMesh(MaterialTable *materials, Chunk *cnk)
 				(1ULL << (16*3-1)) |
 				(1ULL << (16*4-1))
 			);
+#elif CHUNK_WIDTH == 32
+			const u64 eastEdgeMask = ~(
+				(1ULL << (32*0)) |
+				(1ULL << (32*1))
+			);
+			const u64 westEdgeMask = ~(
+				(1ULL << (32*1-1)) |
+				(1ULL << (32*2-1))
+			);
+#else
+#error "Edge masks are not implemented for the current chunk width."
 #endif
 
 			curr->w[i]  |= tilesMaskMove(layerSolidMask, i, -1) & eastEdgeMask;

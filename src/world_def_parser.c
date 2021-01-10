@@ -140,7 +140,7 @@ mgcd_expect_var_int(struct mgcd_parser *parser, MGCD_TYPE(int) *out)
 
 		case MGCD_TOK_INTEGER_LIT:
 			mgcd_eat_token(parser);
-			*out = mgcd_var_lit_int(0);
+			*out = mgcd_var_lit_int(tok.integer_lit);
 			return true;
 
 		default:
@@ -270,14 +270,14 @@ mgcd_parse_shape_op(struct mgcd_parser *parser)
 
 		panic("TODO: Shape");
 	} else if (shape_kind == atoms->cell) {
-		op.kind = MGCD_SHAPE_CELL;
+		op.op = MGCD_SHAPE_CELL;
 
 		if (!mgcd_expect_var_v3i(parser, &op.cell.coord)) {
 			return NULL;
 		}
 
 	} else if (shape_kind == atoms->heightmap) {
-		op.kind = MGCD_SHAPE_HEIGHTMAP;
+		op.op = MGCD_SHAPE_HEIGHTMAP;
 
 		if (!mgcd_expect_var_path(parser, &op.heightmap.file)) {
 			return NULL;
@@ -287,18 +287,8 @@ mgcd_parse_shape_op(struct mgcd_parser *parser)
 			return NULL;
 		}
 
-	} else if (shape_kind == atoms->cube) {
-		op.kind = MGCD_SHAPE_CUBE;
-
-		if (!mgcd_expect_var_v3i(parser, &op.cube.p0)) {
-			return NULL;
-		}
-		if (!mgcd_expect_var_v3i(parser, &op.cube.p1)) {
-			return NULL;
-		}
-
 	} else if (shape_kind == atoms->hexagon) {
-		op.kind = MGCD_SHAPE_HEXAGON;
+		op.op = MGCD_SHAPE_HEXAGON;
 
 		if (!mgcd_expect_var_v3i(parser, &op.hexagon.center)) {
 			return NULL;
@@ -311,7 +301,7 @@ mgcd_parse_shape_op(struct mgcd_parser *parser)
 		}
 
 	} else if (shape_kind == atoms->between) {
-		op.kind = MGCD_SHAPE_BETWEEN;
+		op.op = MGCD_SHAPE_BETWEEN;
 
 		op.between.s0 = mgcd_parse_shape_op(parser);
 		if (!op.between.s0) {
@@ -367,7 +357,6 @@ mgcd_parse_shape_block(struct mgcd_parser *parser, struct mgcd_shape_op **out_op
 {
 	struct mgcd_shape_op *ops = NULL, **ops_ptr = &ops;
 
-
 	while (mgcd_block_continue(mgcd_peek_token(parser))) {
 		if (mgcd_peek_token(parser).type == MGCD_TOK_END_STMT) {
 			mgcd_eat_token(parser);
@@ -417,7 +406,7 @@ mgcd_parse_shape_file(
 	bool result;
 	result = mgcd_parse_shape_block(&parser, &ops);
 
-	file->ops = ops;
+	file->shape.ops = ops;
 
 	return result;
 }
@@ -427,7 +416,7 @@ mgcd_print_shape_file(struct mgcd_shape_file *file)
 {
 	printf("shape file (file format v%i.%i)\n",
 			file->version.major, file->version.minor);
-	struct mgcd_shape_op *op = file->ops;
+	struct mgcd_shape_op *op = file->shape.ops;
 
 	while (op) {
 		mgcd_shape_op_print(op);

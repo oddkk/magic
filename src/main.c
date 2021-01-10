@@ -50,6 +50,37 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
+	hexGridInitialize();
+
+	/*
+	m4i rotate60;
+	mat4_hex_rotate(&rotate60, 1);
+
+	v4i shape[] = {
+		V4i(-1, 1, 0, 1),
+		V4i(-2, 1, 1, 1),
+		V4i(-2, 2, 0, 1),
+	};
+
+	const size_t shape_num_points = 3;
+
+	for (size_t i = 0; i < shape_num_points; i++) {
+		v4i *v = &shape[i];
+		v4i_print(v);
+	}
+	printf("\n");
+
+	for (size_t r = 0; r < 6; r++) {
+		for (size_t i = 0; i < shape_num_points; i++) {
+			v4i *v = &shape[i];
+			vec4i_multiply_mat4(v->m, v->m, rotate60.m);
+
+			v4i_print(v);
+		}
+		printf("\n");
+	}
+	*/
+
 	struct mgc_memory memory = {0};
 	mgc_memory_init(&memory);
 
@@ -70,9 +101,9 @@ int main(int argc, char *argv[])
 	struct mgcd_world world = {0};
 	mgcd_world_init(&world, &memory);
 
-	struct mgcd_context parse_ctx = {0};
+	struct mgcd_context world_decl_ctx = {0};
 	mgcd_context_init(
-			&parse_ctx,
+			&world_decl_ctx,
 			&world,
 			&atom_table,
 			&arena,
@@ -82,41 +113,30 @@ int main(int argc, char *argv[])
 	struct mgcd_lexer lexer = {0};
 	mcgd_parse_open_file(
 			&lexer,
-			&parse_ctx,
+			&world_decl_ctx,
 			"./assets/world/test.shape");
 
 	struct mgcd_shape_file test_shape_file;
-	mgcd_parse_shape_file(&parse_ctx, &lexer, &test_shape_file);
-
-	print_errors(&err_ctx);
+	mgcd_parse_shape_file(&world_decl_ctx, &lexer, &test_shape_file);
 
 	mgcd_print_shape_file(&test_shape_file);
 
-	/*
-	struct mgcd_token token;
-	token = mgcd_read_token(&lexer);
+	struct mgc_shape test_shape = {0};
 
-	if (token.type != MGCD_TOK_VERSION) {
-		printf("Missing version identifier.\n");
-		return -1;
-	}
+	mgcd_complete_shape(
+			&world_decl_ctx,
+			&test_shape_file.shape,
+			&arena,
+			&test_shape);
 
-	struct mgcd_parser parser = {0};
-	mgcd_parse_init(&parser, &parse_ctx, &lexer);
+	print_errors(&err_ctx);
 
-	struct mgcd_shape_op *op;
-	op = mgcd_parse_shape_op(&parser);
-	mgcd_shape_op_print(op);
-
-	while (token.type != MGCD_TOK_EOF) {
-		token = mgcd_read_token(&lexer);
-		mgcd_print_token(&token);
-	}
-	*/
-
-	return 0;
-
-	hexGridInitialize();
+	struct mgc_chunk_mask chunk_mask = {0};
+	mgc_shape_fill_chunk(
+		&chunk_mask,
+		(struct mgc_world_transform){0},
+		&test_shape
+	);
 
 	glfwSetErrorCallback(glfwErrorCallback);
 
@@ -163,8 +183,31 @@ int main(int argc, char *argv[])
 	cam.zoom = 0.5f;
 	cam.location = V3(2.0f, 2.0f, 2.0f);
 
+	/*
+	mgc_chunk_mask_set(&chunk_mask, V3i(7, 7, 0));
+	mgc_chunk_mask_set(&chunk_mask, V3i(8, 7, 0));
+	mgc_chunk_mask_set(&chunk_mask, V3i(7, 8, 0));
+	mgc_chunk_mask_set(&chunk_mask, V3i(8, 8, 0));
+
+	mgc_chunk_mask_set(&chunk_mask, V3i(0, 0, 0));
+	// mgc_chunk_mask_set(&chunk_mask, V3i(0, 1, 0));
+	// mgc_chunk_mask_set(&chunk_mask, V3i(0, 2, 0));
+	// mgc_chunk_mask_set(&chunk_mask, V3i(0, 3, 0));
+
+	mgc_chunk_mask_set(&chunk_mask, V3i(0, 1, 1));
+	// mgc_chunk_mask_set(&chunk_mask, V3i(0, 2, 1));
+	// mgc_chunk_mask_set(&chunk_mask, V3i(0, 3, 1));
+
+	mgc_chunk_mask_set(&chunk_mask, V3i(0, 2, 2));
+	// mgc_chunk_mask_set(&chunk_mask, V3i(0, 3, 2));
+
+	mgc_chunk_mask_set(&chunk_mask, V3i(0, 3, 3));
+	*/
+
 	for (size_t i = 0; i < CHUNK_WIDTH*CHUNK_WIDTH*CHUNK_HEIGHT; i++) {
-		chunk.tiles[i].material = MAT_WOOD;
+		bool is_set = mgc_chunk_mask_geti(&chunk_mask, i);
+		chunk.tiles[i].material = is_set ? MAT_WOOD : MAT_AIR;
+		// chunk.tiles[i].material = MAT_WOOD;
 	}
 
 	GLuint defaultVShader, defaultFShader;

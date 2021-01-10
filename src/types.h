@@ -108,6 +108,25 @@ v3_add(v3 lhs, v3 rhs) { lhs.x += rhs.x; lhs.y += rhs.y; lhs.z += rhs.z; return 
 static inline v4f
 v4_add(v4 lhs, v4 rhs) { lhs.x += rhs.x; lhs.y += rhs.y; lhs.z += rhs.z; lhs.w += rhs.w; return lhs; }
 
+static inline v2i
+v2i_add(v2i lhs, v2i rhs) { lhs.x += rhs.x; lhs.y += rhs.y; return lhs; }
+
+static inline v3i
+v3i_add(v3i lhs, v3i rhs) { lhs.x += rhs.x; lhs.y += rhs.y; lhs.z += rhs.z; return lhs; }
+
+static inline v4i
+v4i_add(v4i lhs, v4i rhs) { lhs.x += rhs.x; lhs.y += rhs.y; lhs.z += rhs.z; lhs.w += rhs.w; return lhs; }
+
+
+m4i *
+m4i_identity(m4i *m);
+
+static inline v2i
+mgc_cube_to_axial(v3i p) { v2i r; r.x = p.x; r.y = p.y; return r; }
+
+static inline v3i
+mgc_axial_to_cube(v2i p) { v3i r; r.x = p.x; r.y = p.y; r.z = -p.x-p.y; return r; }
+
 struct mgc_aabbi {
 	v3i min, max;
 };
@@ -123,6 +142,18 @@ mgc_aabbi_extend_bounds(struct mgc_aabbi lhs, struct mgc_aabbi rhs);
 
 struct mgc_aabbi
 mgc_aabbi_intersect_bounds(struct mgc_aabbi lhs, struct mgc_aabbi rhs);
+
+struct mgc_hexbounds {
+	v2i center;
+	int radius;
+	int height;
+};
+
+struct mgc_hexbounds
+mgc_hexbounds_union(struct mgc_hexbounds lhs, struct mgc_hexbounds rhs);
+
+struct mgc_hexbounds
+mgc_hexbounds_intersect(struct mgc_hexbounds lhs, struct mgc_hexbounds rhs);
 
 #if 0
 #define max(a, b) \

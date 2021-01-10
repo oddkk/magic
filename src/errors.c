@@ -34,9 +34,9 @@ static const char *
 level_prefix(enum mgc_error_level lvl)
 {
 	switch (lvl) {
-		case MGC_ERROR:    return TC(TC_BRIGHT_RED, "ERROR") ": ";
-		case MGC_WARNING:  return TC(TC_YELLOW, "WARNING") ": ";
-		case MGC_INFO:     return TC(TC_BRIGHT_BLUE, "INFO") ": ";
+		case MGC_ERROR:    return TC(TC_BRIGHT_RED, "error") ": ";
+		case MGC_WARNING:  return TC(TC_YELLOW, "warning") ": ";
+		case MGC_INFO:     return TC(TC_BRIGHT_BLUE, "info") ": ";
 		case MGC_APPENDAGE: return "";
 	}
 }
