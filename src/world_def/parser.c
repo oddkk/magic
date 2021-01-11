@@ -2,6 +2,7 @@
 #include <string.h>
 #include "world_def.h"
 #include "vars.h"
+#include "shape.h"
 #include "../utils.h"
 #include "../config.h"
 
