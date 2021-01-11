@@ -1,11 +1,11 @@
 #ifndef MAGIC_WORLD_DEF_H
 #define MAGIC_WORLD_DEF_H
 
-#include "types.h"
-#include "atom.h"
-#include "str.h"
-#include "errors.h"
-#include "shape.h"
+#include "../types.h"
+#include "../atom.h"
+#include "../str.h"
+#include "../errors.h"
+#include "../shape.h"
 #include <stdio.h>
 
 typedef int mgcd_shape_id;

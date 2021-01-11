@@ -8,7 +8,7 @@
 #include "render.h"
 #include "intdef.h"
 
-#include "world_def.h"
+#include "world_def/world_def.h"
 
 static bool shouldQuit = false;
 
