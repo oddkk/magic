@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "world_def.h"
+#include "vars.h"
 #include "../utils.h"
 #include "../config.h"
 
