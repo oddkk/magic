@@ -1,8 +1,7 @@
 #include <stdio.h>
 #include <string.h>
-#include "world_def.h"
-#include "vars.h"
-#include "shape.h"
+#include "parser.h"
+#include "lexer.h"
 #include "../utils.h"
 #include "../config.h"
 
@@ -15,7 +14,7 @@ mgcd_parse_init(struct mgcd_parser *parser,
 	parser->lex = lex;
 }
 
-static struct mgcd_token
+struct mgcd_token
 mgcd_eat_token(struct mgcd_parser *parser)
 {
 	struct mgcd_token tok;
@@ -32,7 +31,7 @@ mgcd_eat_token(struct mgcd_parser *parser)
 	return tok;
 }
 
-static struct mgcd_token
+struct mgcd_token
 mgcd_peek_token(struct mgcd_parser *parser)
 {
 	if (parser->peek_buffer_count == 0) {
@@ -48,7 +47,7 @@ mgcd_peek_token(struct mgcd_parser *parser)
 	return tok;
 }
 
-static bool
+bool
 mgcd_try_get_ident(struct mgcd_token tok, struct atom **out_atom)
 {
 	if (tok.type != MGCD_TOK_IDENT) {
@@ -61,8 +60,7 @@ mgcd_try_get_ident(struct mgcd_token tok, struct atom **out_atom)
 	return true;
 }
 
-
-static bool
+bool
 mgcd_try_eat_ident(struct mgcd_parser *parser, struct atom **out_atom)
 {
 	struct mgcd_token tok;
@@ -75,7 +73,7 @@ mgcd_try_eat_ident(struct mgcd_parser *parser, struct atom **out_atom)
 	return false;
 }
 
-static bool
+bool
 mgcd_try_get_version(struct mgcd_token tok, struct mgcd_version *out_version)
 {
 	if (tok.type != MGCD_TOK_VERSION) {
@@ -88,7 +86,7 @@ mgcd_try_get_version(struct mgcd_token tok, struct mgcd_version *out_version)
 	return true;
 }
 
-static bool
+bool
 mgcd_try_eat_version(struct mgcd_parser *parser, struct mgcd_version *out_version)
 {
 	struct mgcd_token tok;
@@ -101,7 +99,7 @@ mgcd_try_eat_version(struct mgcd_parser *parser, struct mgcd_version *out_versio
 	return false;
 }
 
-static bool
+bool
 mgcd_try_get_path(struct mgcd_token tok, struct string *out_path)
 {
 	if (tok.type != MGCD_TOK_FILE_PATH) {
@@ -115,7 +113,7 @@ mgcd_try_get_path(struct mgcd_token tok, struct string *out_path)
 	return true;
 }
 
-static bool
+bool
 mgcd_expect_var_path(struct mgcd_parser *parser, struct string *out_path)
 {
 	struct mgcd_token tok;
@@ -128,7 +126,7 @@ mgcd_expect_var_path(struct mgcd_parser *parser, struct string *out_path)
 	return false;
 }
 
-static bool
+bool
 mgcd_expect_var_int(struct mgcd_parser *parser, MGCD_TYPE(int) *out)
 {
 	struct mgcd_token tok;
@@ -150,7 +148,7 @@ mgcd_expect_var_int(struct mgcd_parser *parser, MGCD_TYPE(int) *out)
 	}
 }
 
-static bool
+bool
 mgcd_expect_tok(struct mgcd_parser *parser, enum mgcd_token_type type)
 {
 	struct mgcd_token tok;
@@ -179,7 +177,7 @@ mgcd_try_get_int(struct mgcd_token tok, int *out_int)
 }
 #endif
 
-static bool
+bool
 mgcd_expect_int(struct mgcd_parser *parser, int *out)
 {
 	struct mgcd_token tok;
@@ -197,7 +195,7 @@ mgcd_expect_int(struct mgcd_parser *parser, int *out)
 	}
 }
 
-static bool
+bool
 mgcd_expect_var_v3i(struct mgcd_parser *parser, MGCD_TYPE(v3i) *out)
 {
 	struct mgcd_token tok;
@@ -237,96 +235,7 @@ mgcd_expect_var_v3i(struct mgcd_parser *parser, MGCD_TYPE(v3i) *out)
 	}
 }
 
-static struct mgcd_shape_op *
-mgcd_alloc_shape_op(struct mgcd_parser *parser, struct mgcd_shape_op op)
-{
-	struct paged_list *shape_ops = &parser->ctx->world->shape_ops;
-
-	size_t new_op_id;
-	new_op_id = paged_list_push(shape_ops);
-
-	struct mgcd_shape_op *new_op;
-	new_op = paged_list_get(shape_ops, new_op_id);
-
-	*new_op = op;
-
-	return new_op;
-}
-
-struct mgcd_shape_op *
-mgcd_parse_shape_op(struct mgcd_parser *parser)
-{
-	struct atom *shape_kind;
-	if (!mgcd_try_eat_ident(parser, &shape_kind)) {
-		return NULL;
-	}
-
-	struct mgcd_atoms *atoms;
-	atoms = &parser->ctx->atoms;
-
-	struct mgcd_shape_op op = {0};
-
-	if (shape_kind == atoms->shape) {
-		// op.kind = MGCD_SHAPE_SHAPE;
-		// op.shape.
-
-		panic("TODO: Shape");
-	} else if (shape_kind == atoms->cell) {
-		op.op = MGCD_SHAPE_CELL;
-
-		if (!mgcd_expect_var_v3i(parser, &op.cell.coord)) {
-			return NULL;
-		}
-
-	} else if (shape_kind == atoms->heightmap) {
-		op.op = MGCD_SHAPE_HEIGHTMAP;
-
-		if (!mgcd_expect_var_path(parser, &op.heightmap.file)) {
-			return NULL;
-		}
-
-		if (!mgcd_expect_var_v3i(parser, &op.heightmap.coord)) {
-			return NULL;
-		}
-
-	} else if (shape_kind == atoms->hexagon) {
-		op.op = MGCD_SHAPE_HEXAGON;
-
-		if (!mgcd_expect_var_v3i(parser, &op.hexagon.center)) {
-			return NULL;
-		}
-		if (!mgcd_expect_var_int(parser, &op.hexagon.radius)) {
-			return NULL;
-		}
-		if (!mgcd_expect_var_int(parser, &op.hexagon.height)) {
-			op.hexagon.height = mgcd_var_lit_int(1);
-		}
-
-	} else if (shape_kind == atoms->between) {
-		op.op = MGCD_SHAPE_BETWEEN;
-
-		op.between.s0 = mgcd_parse_shape_op(parser);
-		if (!op.between.s0) {
-			return NULL;
-		}
-
-		if (!mgcd_expect_tok(parser, MGCD_TOK_ARG_SEP)) {
-			return NULL;
-		}
-
-		op.between.s1 = mgcd_parse_shape_op(parser);
-		if (!op.between.s1) {
-			return NULL;
-		}
-
-	} else {
-		return NULL;
-	}
-
-	return mgcd_alloc_shape_op(parser, op);
-}
-
-static bool
+bool
 mgcd_stmt_error_recover(struct mgcd_parser *parser)
 {
 	struct mgcd_token current_token;
@@ -341,7 +250,7 @@ mgcd_stmt_error_recover(struct mgcd_parser *parser)
 	return current_token.type != MGCD_TOK_EOF;
 }
 
-static bool
+bool
 mgcd_block_continue(struct mgcd_token tok)
 {
 	switch (tok.type) {
@@ -351,77 +260,5 @@ mgcd_block_continue(struct mgcd_token tok)
 
 		default:
 			return true;
-	}
-}
-
-bool
-mgcd_parse_shape_block(struct mgcd_parser *parser, struct mgcd_shape_op **out_ops)
-{
-	struct mgcd_shape_op *ops = NULL, **ops_ptr = &ops;
-
-	while (mgcd_block_continue(mgcd_peek_token(parser))) {
-		if (mgcd_peek_token(parser).type == MGCD_TOK_END_STMT) {
-			mgcd_eat_token(parser);
-			continue;
-		}
-
-		struct mgcd_shape_op *stmt;
-		stmt = mgcd_parse_shape_op(parser);
-
-		if (!stmt) {
-			mgcd_stmt_error_recover(parser);
-			continue;
-		}
-
-		*ops_ptr = stmt;
-		ops_ptr = &stmt->next;
-
-		if (!mgcd_expect_tok(parser, MGCD_TOK_END_STMT)) {
-			mgc_error(parser->ctx->err, MGC_NO_LOC,
-					"Expected ';'.");
-			mgcd_stmt_error_recover(parser);
-			continue;
-		}
-	}
-
-	*out_ops = ops;
-	return true;
-}
-
-bool
-mgcd_parse_shape_file(
-		struct mgcd_context *parse_ctx,
-		struct mgcd_lexer *lexer,
-		struct mgcd_shape_file *file)
-{
-	memset(file, 0, sizeof(struct mgcd_shape_file));
-
-	struct mgcd_parser parser = {0};
-	mgcd_parse_init(&parser, parse_ctx, lexer);
-
-	if (!mgcd_try_eat_version(&parser, &file->version)) {
-		mgc_warning(parse_ctx->err, MGC_NO_LOC,
-				"Missing version number. Assuming newest version.\n");
-	}
-
-	struct mgcd_shape_op *ops = NULL;
-	bool result;
-	result = mgcd_parse_shape_block(&parser, &ops);
-
-	file->shape.ops = ops;
-
-	return result;
-}
-
-void
-mgcd_print_shape_file(struct mgcd_shape_file *file)
-{
-	printf("shape file (file format v%i.%i)\n",
-			file->version.major, file->version.minor);
-	struct mgcd_shape_op *op = file->shape.ops;
-
-	while (op) {
-		mgcd_shape_op_print(op);
-		op = op->next;
 	}
 }

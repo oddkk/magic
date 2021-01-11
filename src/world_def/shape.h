@@ -70,6 +70,9 @@ struct mgcd_shape {
 	size_t num_vars;
 };
 
+struct mgcd_parser;
+struct mgcd_lexer;
+
 struct mgcd_shape_op *
 mgcd_parse_shape_op(struct mgcd_parser *);
 

@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <string.h>
+#include "lexer.h"
 #include "world_def.h"
+#include "parser.h"
 #include "../utils.h"
 
 #define LEX_BUFFER_SIZE (4096)
@@ -128,7 +130,7 @@ mgcd_reset_token(struct mgcd_lexer *ctx)
 	ctx->tok = ctx->cur;
 }
 
-static int
+int
 mgcd_eat_n_char(struct mgcd_lexer *ctx, size_t n)
 {
 	if (ctx->lim <= (ctx->cur + n)) {
@@ -141,13 +143,13 @@ mgcd_eat_n_char(struct mgcd_lexer *ctx, size_t n)
 	return *ctx->cur;
 }
 
-static int
+int
 mgcd_peek_char(struct mgcd_lexer *ctx)
 {
 	return *ctx->cur;
 }
 
-static int
+int
 mgcd_peek_char_offset(struct mgcd_lexer *ctx, size_t offset)
 {
 	if (ctx->lim <= (ctx->cur + offset)) {
@@ -175,7 +177,7 @@ mgcd_expect_sym(struct mgcd_lexer *ctx, struct string word)
 	return true;
 }
 
-static bool
+bool
 mgcd_expect_char(struct mgcd_lexer *ctx, int expected)
 {
 	int c = mgcd_peek_char(ctx);
@@ -238,7 +240,7 @@ char_is_any_whitespace(int c)
 		|| char_is_newline(c);
 }
 
-static struct string
+struct string
 mgcd_eat_word_alphanum(struct mgcd_lexer *ctx)
 {
 	int c = mgcd_peek_char(ctx);
@@ -255,7 +257,7 @@ mgcd_eat_word_alphanum(struct mgcd_lexer *ctx)
 	return result;
 }
 
-static struct string
+struct string
 mgcd_eat_word_num(struct mgcd_lexer *ctx)
 {
 	int c = mgcd_peek_char(ctx);
@@ -273,7 +275,7 @@ mgcd_eat_word_num(struct mgcd_lexer *ctx)
 }
 
 
-static void
+void
 mgcd_eat_whitespace(struct mgcd_lexer *ctx, bool keep_token)
 {
 	int c = mgcd_peek_char(ctx);
@@ -287,7 +289,7 @@ mgcd_eat_whitespace(struct mgcd_lexer *ctx, bool keep_token)
 	}
 }
 
-static void
+void
 mgcd_eat_any_whitespace(struct mgcd_lexer *ctx, bool keep_token)
 {
 	int c = mgcd_peek_char(ctx);
@@ -301,7 +303,7 @@ mgcd_eat_any_whitespace(struct mgcd_lexer *ctx, bool keep_token)
 	}
 }
 
-static void
+void
 mgcd_eat_rest_of_line(struct mgcd_lexer *ctx)
 {
 	int c = mgcd_peek_char(ctx);
@@ -312,7 +314,7 @@ mgcd_eat_rest_of_line(struct mgcd_lexer *ctx)
 	}
 }
 
-static struct mgcd_token
+struct mgcd_token
 mgcd_eat_single_char_token(struct mgcd_lexer *ctx, enum mgcd_token_type type)
 {
 	mgcd_eat_n_char(ctx, 1);
@@ -322,7 +324,7 @@ mgcd_eat_single_char_token(struct mgcd_lexer *ctx, enum mgcd_token_type type)
 	return token;
 }
 
-static bool
+bool
 mgcd_expect_version_num(struct mgcd_lexer *ctx,
 		struct mgcd_version *out_version)
 {

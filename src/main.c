@@ -10,6 +10,7 @@
 
 #include "world_def/world_def.h"
 #include "world_def/shape.h"
+#include "world_def/lexer.h"
 
 static bool shouldQuit = false;
 
