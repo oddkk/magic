@@ -1,6 +1,7 @@
 #include "world_def.h"
 #include "vars.h"
 #include "shape.h"
+#include "jobs.h"
 #include "../utils.h"
 #include <string.h>
 
@@ -17,6 +18,7 @@ void
 mgcd_context_init(struct mgcd_context *ctx,
 		struct mgcd_world *world,
 		struct atom_table *atom_table,
+		struct mgc_memory *memory,
 		struct arena *mem,
 		struct arena *tmp_mem,
 		struct mgc_error_context *err)
@@ -31,4 +33,6 @@ mgcd_context_init(struct mgcd_context *ctx,
 #define ATOM(name) ctx->atoms.name = atom_create(ctx->atom_table, STR(#name));
 	MGCD_ATOMS
 #undef ATOM
+
+	mgcd_context_jobs_init(ctx, memory);
 }

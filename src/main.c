@@ -11,6 +11,7 @@
 #include "world_def/world_def.h"
 #include "world_def/shape.h"
 #include "world_def/lexer.h"
+#include "world_def/jobs.h"
 
 static bool shouldQuit = false;
 
@@ -108,9 +109,21 @@ int main(int argc, char *argv[])
 			&world_decl_ctx,
 			&world,
 			&atom_table,
+			&memory,
 			&arena,
 			&tmp_arena,
 			&err_ctx);
+
+	mgcd_job_id j1, j2, j3;
+	j1 = mgcd_job_nopf(&world_decl_ctx, &j1, "job 1");
+	j2 = mgcd_job_nopf(&world_decl_ctx, &j2, "job 2");
+	j3 = mgcd_job_nopf(&world_decl_ctx, &j3, "job 3");
+
+	mgcd_job_dependency(&world_decl_ctx, j1, j2);
+	mgcd_job_dependency(&world_decl_ctx, j1, j3);
+	mgcd_job_dependency(&world_decl_ctx, j2, j3);
+
+	mgcd_jobs_dispatch(&world_decl_ctx);
 
 	struct mgcd_lexer lexer = {0};
 	mcgd_parse_open_file(

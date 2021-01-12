@@ -2,6 +2,7 @@
 #define MAGIC_WORLD_DEF_SHAPE_H
 
 #include "world_def.h"
+#include "../shape.h"
 
 typedef int mgcd_shape_id;
 typedef int mgcd_heightmap_id;
