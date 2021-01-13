@@ -206,6 +206,10 @@ int read_character(struct string str, char **it)
 	return result;
 }
 
+int peek_character(struct string str, char *it)
+{
+	return read_character(str, &it);
+}
 bool string_split(struct string in, struct string *result,
 				  struct string *rest, int sep)
 {

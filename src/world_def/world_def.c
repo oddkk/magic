@@ -36,3 +36,11 @@ mgcd_context_init(struct mgcd_context *ctx,
 
 	mgcd_context_jobs_init(ctx, memory);
 }
+
+void
+mgcd_request_resource(struct mgcd_context *ctx, struct string path)
+{
+	arena_mark cp = arena_checkpoint(ctx->tmp_mem);
+
+	arena_reset(ctx->tmp_mem, cp);
+}

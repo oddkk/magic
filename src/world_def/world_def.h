@@ -40,6 +40,36 @@ struct mgcd_atoms {
 #undef ATOM
 };
 
+enum mgcd_entry_type {
+	MGCD_ENTRY_UNKNOWN = 0,
+	MGCD_ENTRY_SHAPE,
+};
+
+struct mgcd_file;
+
+// TODO: Handle other file types like images and audio?
+struct mgcd_entry {
+	struct atom *name;
+
+	enum mgcd_entry_type type;
+
+	struct mgcd_file *file;
+};
+
+struct mgcd_scope {
+	struct mgcd_entry *entries;
+};
+
+struct mgcd_file {
+	struct string file_name;
+
+	struct mgcd_entry *entries;
+	size_t num_entries;
+
+	mgcd_job_id parsed;
+	mgcd_job_id finalized;
+};
+
 struct mgcd_context {
 	struct mgcd_world *world;
 	struct mgcd_atoms atoms;
@@ -52,6 +82,8 @@ struct mgcd_context {
 	mgcd_job_id free_list;
 	mgcd_job_id terminal_jobs;
 	size_t unvisited_job_deps;
+
+	struct paged_list files;
 
 	struct mgc_error_context *err;
 
@@ -66,5 +98,8 @@ mgcd_context_init(struct mgcd_context *,
 		struct arena *mem,
 		struct arena *tmp_mem,
 		struct mgc_error_context *err);
+
+void
+mgcd_request_resource(struct mgcd_context *, struct string path);
 
 #endif

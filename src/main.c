@@ -12,6 +12,7 @@
 #include "world_def/shape.h"
 #include "world_def/lexer.h"
 #include "world_def/jobs.h"
+#include "world_def/path.h"
 
 static bool shouldQuit = false;
 
@@ -97,8 +98,11 @@ int main(int argc, char *argv[])
 	err_ctx.string_arena = &arena;
 	err_ctx.transient_arena = &tmp_arena;
 
+	struct arena atom_arena = {0};
+	arena_init(&atom_arena, &memory);
+
 	struct atom_table atom_table = {0};
-	atom_table.string_arena = &arena;
+	atom_table.string_arena = &atom_arena;
 	atom_table_rehash(&atom_table, 64);
 
 	struct mgcd_world world = {0};
@@ -114,14 +118,15 @@ int main(int argc, char *argv[])
 			&tmp_arena,
 			&err_ctx);
 
-	mgcd_job_id j1, j2, j3;
-	j1 = mgcd_job_nopf(&world_decl_ctx, &j1, "job 1");
-	j2 = mgcd_job_nopf(&world_decl_ctx, &j2, "job 2");
-	j3 = mgcd_job_nopf(&world_decl_ctx, &j3, "job 3");
+	struct mgcd_path path;
+	if (mgcd_path_parse_str(&tmp_arena, &atom_table, STR("/asdf/test/../../foo/bar"), &path)) {
+		printf("failed to parse path\n");
+		return -1;
+	}
+	mgcd_path_print(&path);
+	printf("\n");
 
-	mgcd_job_dependency(&world_decl_ctx, j1, j2);
-	mgcd_job_dependency(&world_decl_ctx, j1, j3);
-	mgcd_job_dependency(&world_decl_ctx, j2, j3);
+	mgcd_request_resource(&world_decl_ctx, STR("/world/test"));
 
 	mgcd_jobs_dispatch(&world_decl_ctx);
 
