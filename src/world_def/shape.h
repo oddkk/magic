@@ -4,7 +4,6 @@
 #include "world_def.h"
 #include "../shape.h"
 
-typedef int mgcd_shape_id;
 typedef int mgcd_heightmap_id;
 
 enum mgcd_shape_op_kind {
@@ -22,7 +21,7 @@ struct mgcd_shape_op {
 
 	union {
 		struct {
-			MGCD_TYPE(mgcd_shape_id) id;
+			MGCD_TYPE(mgcd_resource_id) id;
 			MGCD_TYPE(int) rotation;
 			MGCD_TYPE(v3i) translation;
 		} shape;
@@ -60,15 +59,24 @@ mgcd_shape_op_num_children(struct mgcd_shape_op *);
 void
 mgcd_shape_op_print(struct mgcd_shape_op *);
 
+enum mgcd_var_kind {
+	MGCD_VAR_PATH,
+};
+
 struct mgcd_var_def {
-	struct atom *name;
+	enum mgcd_type type;
+
+	enum mgcd_var_kind kind;
+	union {
+		struct mgcd_path path;
+	};
+
+	struct mgcd_var_def *next;
 };
 
 struct mgcd_shape {
 	struct mgcd_shape_op *ops;
-
 	struct mgcd_var_def *vars;
-	size_t num_vars;
 };
 
 struct mgcd_parser;
@@ -76,6 +84,12 @@ struct mgcd_lexer;
 
 struct mgcd_shape_op *
 mgcd_parse_shape_op(struct mgcd_parser *);
+
+bool
+mgcd_parse_shape_block(
+		struct mgcd_parser *parser,
+		struct mgcd_shape *shape,
+		struct mgcd_shape_op **out_ops);
 
 struct mgcd_shape_file {
 	struct mgcd_version version;
@@ -91,7 +105,7 @@ mgcd_parse_shape_file(
 void
 mgcd_print_shape_file(struct mgcd_shape_file *file);
 
-bool
+int
 mgcd_complete_shape(struct mgcd_context *,
 		struct mgcd_shape *shape,
 		struct arena *mem,

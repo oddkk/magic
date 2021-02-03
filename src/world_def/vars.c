@@ -75,7 +75,7 @@ mgcd_lit_print_v3i(v3i val)
 }
 
 static void
-mgcd_lit_print_mgcd_shape_id(mgcd_shape_id val)
+mgcd_lit_print_mgcd_resource_id(mgcd_resource_id val)
 {
-	printf("<shape %i>", val);
+	printf("<resource %i>", val);
 }

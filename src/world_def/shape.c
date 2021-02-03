@@ -21,7 +21,7 @@ mgcd_shape_op_print(struct mgcd_shape_op *op)
 		case MGCD_SHAPE_SHAPE:
 			printf("SHAPE");
 			printf(" id=");
-			mgcd_var_print_mgcd_shape_id(op->shape.id);
+			mgcd_var_print_mgcd_resource_id(op->shape.id);
 			printf(" rotation=");
 			mgcd_var_print_int(op->shape.rotation);
 			printf(" translation=");
@@ -146,7 +146,10 @@ mgcd_parse_shape_op(struct mgcd_parser *parser)
 }
 
 bool
-mgcd_parse_shape_block(struct mgcd_parser *parser, struct mgcd_shape_op **out_ops)
+mgcd_parse_shape_block(
+		struct mgcd_parser *parser,
+		struct mgcd_shape *shape,
+		struct mgcd_shape_op **out_ops)
 {
 	struct mgcd_shape_op *ops = NULL, **ops_ptr = &ops;
 
@@ -195,11 +198,9 @@ mgcd_parse_shape_file(
 				"Missing version number. Assuming newest version.\n");
 	}
 
-	struct mgcd_shape_op *ops = NULL;
 	bool result;
-	result = mgcd_parse_shape_block(&parser, &ops);
-
-	file->shape.ops = ops;
+	result = mgcd_parse_shape_block(
+			&parser, &file->shape, &file->shape.ops);
 
 	return result;
 }
@@ -323,7 +324,7 @@ mgcd_complete_shape_internal(
 	return result;
 }
 
-bool
+int
 mgcd_complete_shape(struct mgcd_context *ctx,
 		struct mgcd_shape *shape,
 		struct arena *mem,
@@ -337,7 +338,7 @@ mgcd_complete_shape(struct mgcd_context *ctx,
 
 	if (result.error) {
 		arena_reset(ctx->tmp_mem, cp);
-		return false;
+		return -1;
 	}
 
 	size_t num_ops = 0;
@@ -366,5 +367,6 @@ mgcd_complete_shape(struct mgcd_context *ctx,
 	memset(out_shape, 0, sizeof(struct mgc_shape));
 	out_shape->ops = final_ops;
 	out_shape->num_ops = num_ops;
-	return false;
+
+	return 0;
 }

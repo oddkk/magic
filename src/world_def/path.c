@@ -1,4 +1,5 @@
 #include "path.h"
+#include "world_def.h"
 #include "../str.h"
 #include "../arena.h"
 #include "../types.h"
@@ -148,8 +149,8 @@ mgcd_path_parse_str(struct arena *mem, struct atom_table *atom_table, struct str
 	num_segments = mgcd_path_simplify(atom_table, &head, num_segments);
 
 	struct atom *parent_atom = atom_create(atom_table, STR(".."));
-	if (head && head->ident == parent_atom) {
-		// If we encounter a '..' as the first segment the user has attempted
+	if (origin == MGCD_PATH_ABS && head && head->ident == parent_atom) {
+		// If we encounter a '/..' as the first segment the user has attempted
 		// to access a resource above the asset path.
 		arena_reset(mem, cp);
 		return -1;
@@ -164,7 +165,95 @@ mgcd_path_parse_str(struct arena *mem, struct atom_table *atom_table, struct str
 		segments[i] = it->ident;
 	}
 
-	arena_reset_and_keep(mem, cp, segments, sizeof(struct atom *) * num_segments);
+	segments = arena_reset_and_keep(mem, cp, segments, sizeof(struct atom *) * num_segments);
+
+	memset(out, 0, sizeof(struct mgcd_path));
+	out->segments = segments;
+	out->num_segments = num_segments;
+
+	return 0;
+}
+
+int
+mgcd_path_make_abs(struct mgcd_context *ctx,
+		mgcd_resource_id root_scope, struct mgcd_path path,
+		struct mgcd_path *out)
+{
+	if (path.origin == MGCD_PATH_ABS) {
+		*out = path;
+		return 0;
+	}
+
+	struct atom *parent_atom = atom_create(ctx->atom_table, STR(".."));
+
+	if (root_scope == MGCD_RESOURCE_NONE) {
+		bool parent_segment_found = false;
+		for (size_t i = 0; i < path.num_segments; i++) {
+			if (path.segments[i] == parent_atom) {
+				parent_segment_found = true;
+				break;
+			}
+		}
+
+		if (!parent_segment_found) {
+			*out = path;
+			return 0;
+		}
+
+		root_scope = ctx->root_scope;
+	}
+
+	struct arena *mem = ctx->tmp_mem;
+	arena_mark cp = arena_checkpoint(mem);
+
+	struct mgcd_path_tmp_segment *root = NULL;
+	struct mgcd_path_tmp_segment **head_ptr = NULL;
+	size_t num_segments = 0;
+
+	// Build path to the root scope.
+	mgcd_resource_id scope_it = root_scope;
+	while (scope_it != root_scope) {
+		struct mgcd_resource *scope = mgcd_resource_get(ctx, root_scope);
+
+		struct mgcd_path_tmp_segment *new_seg;
+		new_seg = arena_alloc(mem, sizeof(struct mgcd_path_tmp_segment));
+
+		assert(scope->name);
+		new_seg->ident = scope->name;
+
+		new_seg->next = root;
+		root = new_seg;
+		num_segments += 1;
+
+		if (head_ptr == NULL) {
+			head_ptr = &new_seg->next;
+		}
+
+		scope_it = scope->parent;
+	}
+
+	// Append the given path.
+	for (size_t i = 0; i < path.num_segments; i++) {
+		struct mgcd_path_tmp_segment *new_seg;
+		new_seg = arena_alloc(mem, sizeof(struct mgcd_path_tmp_segment));
+
+		*head_ptr = new_seg;
+		head_ptr = &new_seg->next;
+		num_segments += 1;
+	}
+
+	num_segments = mgcd_path_simplify(ctx->atom_table, &root, num_segments);
+
+	struct atom **segments = arena_alloc(mem, sizeof(struct mgcd_path_tmp_segment));
+	struct mgcd_path_tmp_segment *it = root;
+	for (size_t i = 0; i < num_segments; i++, it = it->next) {
+		assert(it);
+		// Because of the simplify, we should never encounter any '..' as segments.
+		assert(it->ident != parent_atom);
+		segments[i] = it->ident;
+	}
+
+	segments = arena_reset_and_keep(mem, cp, segments, sizeof(struct atom *) * num_segments);
 
 	memset(out, 0, sizeof(struct mgcd_path));
 	out->segments = segments;

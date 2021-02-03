@@ -49,41 +49,14 @@ void windowSizeCallback(GLFWwindow *win, int width, int height) {
 
 int main(int argc, char *argv[])
 {
+	int err;
+
 	if (!glfwInit()) {
 		printf("Failed to initialize glfw.\n");
 		return -1;
 	}
 
 	hexGridInitialize();
-
-	/*
-	m4i rotate60;
-	mat4_hex_rotate(&rotate60, 1);
-
-	v4i shape[] = {
-		V4i(-1, 1, 0, 1),
-		V4i(-2, 1, 1, 1),
-		V4i(-2, 2, 0, 1),
-	};
-
-	const size_t shape_num_points = 3;
-
-	for (size_t i = 0; i < shape_num_points; i++) {
-		v4i *v = &shape[i];
-		v4i_print(v);
-	}
-	printf("\n");
-
-	for (size_t r = 0; r < 6; r++) {
-		for (size_t i = 0; i < shape_num_points; i++) {
-			v4i *v = &shape[i];
-			vec4i_multiply_mat4(v->m, v->m, rotate60.m);
-
-			v4i_print(v);
-		}
-		printf("\n");
-	}
-	*/
 
 	struct mgc_memory memory = {0};
 	mgc_memory_init(&memory);
@@ -118,44 +91,26 @@ int main(int argc, char *argv[])
 			&tmp_arena,
 			&err_ctx);
 
-	struct mgcd_path path;
-	if (mgcd_path_parse_str(&tmp_arena, &atom_table, STR("/asdf/test/../../foo/bar"), &path)) {
-		printf("failed to parse path\n");
+	mgcd_resource_id test_shape_id;
+	test_shape_id = mgcd_request_resource_str(
+			&world_decl_ctx, MGCD_RESOURCE_NONE, STR("/world/test"));
+
+	err = mgcd_jobs_dispatch(&world_decl_ctx);
+	print_errors(&err_ctx);
+
+	if (err) {
 		return -1;
 	}
-	mgcd_path_print(&path);
-	printf("\n");
+	assert(err_ctx.num_errors == 0);
 
-	mgcd_request_resource(&world_decl_ctx, STR("/world/test"));
-
-	mgcd_jobs_dispatch(&world_decl_ctx);
-
-	struct mgcd_lexer lexer = {0};
-	mcgd_parse_open_file(
-			&lexer,
-			&world_decl_ctx,
-			"./assets/world/test.shape");
-
-	struct mgcd_shape_file test_shape_file;
-	mgcd_parse_shape_file(&world_decl_ctx, &lexer, &test_shape_file);
-
-	mgcd_print_shape_file(&test_shape_file);
-
-	struct mgc_shape test_shape = {0};
-
-	mgcd_complete_shape(
-			&world_decl_ctx,
-			&test_shape_file.shape,
-			&arena,
-			&test_shape);
-
-	print_errors(&err_ctx);
+	struct mgc_shape *test_shape;
+	test_shape = mgcd_expect_shape(&world_decl_ctx, test_shape_id);
 
 	struct mgc_chunk_mask chunk_mask = {0};
 	mgc_shape_fill_chunk(
 		&chunk_mask,
 		(struct mgc_world_transform){0},
-		&test_shape
+		test_shape
 	);
 
 	glfwSetErrorCallback(glfwErrorCallback);
@@ -187,7 +142,6 @@ int main(int argc, char *argv[])
 
 	printf("OpenGL %s\n", glGetString(GL_VERSION));
 
-	int err;
 	err = renderInitialize(&winCtx.render);
 	if (err) {
 		return -1;
@@ -203,31 +157,9 @@ int main(int argc, char *argv[])
 	cam.zoom = 0.5f;
 	cam.location = V3(2.0f, 2.0f, 2.0f);
 
-	/*
-	mgc_chunk_mask_set(&chunk_mask, V3i(7, 7, 0));
-	mgc_chunk_mask_set(&chunk_mask, V3i(8, 7, 0));
-	mgc_chunk_mask_set(&chunk_mask, V3i(7, 8, 0));
-	mgc_chunk_mask_set(&chunk_mask, V3i(8, 8, 0));
-
-	mgc_chunk_mask_set(&chunk_mask, V3i(0, 0, 0));
-	// mgc_chunk_mask_set(&chunk_mask, V3i(0, 1, 0));
-	// mgc_chunk_mask_set(&chunk_mask, V3i(0, 2, 0));
-	// mgc_chunk_mask_set(&chunk_mask, V3i(0, 3, 0));
-
-	mgc_chunk_mask_set(&chunk_mask, V3i(0, 1, 1));
-	// mgc_chunk_mask_set(&chunk_mask, V3i(0, 2, 1));
-	// mgc_chunk_mask_set(&chunk_mask, V3i(0, 3, 1));
-
-	mgc_chunk_mask_set(&chunk_mask, V3i(0, 2, 2));
-	// mgc_chunk_mask_set(&chunk_mask, V3i(0, 3, 2));
-
-	mgc_chunk_mask_set(&chunk_mask, V3i(0, 3, 3));
-	*/
-
 	for (size_t i = 0; i < CHUNK_WIDTH*CHUNK_WIDTH*CHUNK_HEIGHT; i++) {
 		bool is_set = mgc_chunk_mask_geti(&chunk_mask, i);
 		chunk.tiles[i].material = is_set ? MAT_WOOD : MAT_AIR;
-		// chunk.tiles[i].material = MAT_WOOD;
 	}
 
 	GLuint defaultVShader, defaultFShader;

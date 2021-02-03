@@ -4,11 +4,11 @@
 #include "../types.h"
 
 typedef int mgcd_var_id;
-typedef int mgcd_shape_id;
+typedef int mgcd_resource_id;
 
 #define MGCD_DEF_VAR_TYPES \
 	TYPE(int, int) \
-	TYPE(mgcd_shape_id, mgcd_shape_id) \
+	TYPE(mgcd_resource_id, mgcd_resource_id) \
 	TYPE(v3i, v3i)
 
 #define TYPE(name, type) \

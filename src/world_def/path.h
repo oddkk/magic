@@ -19,6 +19,14 @@ int
 mgcd_path_parse_str(struct arena *mem, struct atom_table *atom_table, struct string path,
 		struct mgcd_path *out);
 
+typedef int mgcd_resource_id;
+struct mgcd_context;
+
+int
+mgcd_path_make_abs(struct mgcd_context *ctx,
+		mgcd_resource_id root_scope, struct mgcd_path path,
+		struct mgcd_path *out);
+
 void
 mgcd_path_print(struct mgcd_path *);
 

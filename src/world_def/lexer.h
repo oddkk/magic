@@ -18,7 +18,7 @@ struct mgcd_lexer {
 };
 
 int
-mcgd_parse_open_file(
+mgcd_parse_open_file(
 		struct mgcd_lexer *lex,
 		struct mgcd_context *ctx,
 		char *file);

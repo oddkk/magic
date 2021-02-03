@@ -13,6 +13,12 @@ struct mgcd_job_nop_data {
 
 #define MGCD_JOBS                                       \
 	JOB(nop, struct mgcd_job_nop_data)                  \
+	                                                    \
+	JOB(file_parse, mgcd_file_id)                       \
+	                                                    \
+	JOB(res_names, mgcd_resource_id)                    \
+	JOB(res_finalize, mgcd_resource_id)                 \
+
 
 #define JOB(name, type)							\
 	mgcd_job_id									\
