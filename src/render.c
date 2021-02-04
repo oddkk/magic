@@ -420,12 +420,16 @@ tilesMaskMove(u64 *mask, size_t i, i64 movement)
 size_t
 u8CountSetBits(u8 v)
 {
+#if 1
+	return __builtin_popcount(v);
+#else
 	size_t count = 0;
 	while (v) {
 		count += v & 1;
 		v >>= 1;
 	}
 	return count;
+#endif
 }
 
 Mesh
@@ -440,12 +444,19 @@ chunkGenMesh(MaterialTable *materials, Chunk *cnk)
 	// [nw, ne, w, e, sw, se, above, below] for each tile.
 	u8 *cullMask = calloc(sizeof(u8), 8*CHUNK_NUM_TILES);
 
+	u8 *tileColor;
+	tileColor = calloc(sizeof(u8), CHUNK_NUM_TILES * 3);
+
 	LayerNeighbours *neighbourMasks = calloc(sizeof(LayerNeighbours), 3);
 
 	for (size_t i = 0; i < CHUNK_NUM_TILES; i++) {
 		Tile *tile = &cnk->tiles[i];
 		Material *mat = getMaterial(materials, tile->material);
 		solidMask[i/bitsPerUnit] |= (mat->solid ? 1ULL : 0ULL) << (i % bitsPerUnit);
+
+		tileColor[i*3+0] = 255;
+		tileColor[i*3+1] = 0;
+		tileColor[i*3+2] = 0;
 	}
 
 	LayerNeighbours *prev, *curr, *next;
@@ -573,7 +584,10 @@ chunkGenMesh(MaterialTable *materials, Chunk *cnk)
 		V3(-xOffset, 0.0f,  yOffset),
 	};
 
-	v3 *vertices = calloc(sizeof(v3), 3*2 * numTriangles);
+	// position, normal, and color per vertex.
+	const size_t vertexStride = sizeof(v3)*2 + sizeof(u8)*3;
+	u8 *vertices = calloc(vertexStride, 3 * numTriangles);
+
 	size_t vertI = 0;
 	for (size_t i = 0; i < CHUNK_NUM_TILES; i++) {
 		bool solid = !!(solidMask[i / bitsPerUnit] & (1ULL << (i % bitsPerUnit)));
@@ -592,16 +606,24 @@ chunkGenMesh(MaterialTable *materials, Chunk *cnk)
 			coord.z * hexStrideY
 		);
 
+		u8 colorR = tileColor[i*3+0];
+		u8 colorG = tileColor[i*3+1];
+		u8 colorB = tileColor[i*3+2];
+
 		u8 visibleMask = ~cullMask[i];
 
+#define EMIT_HEX_VERTEX(n, i) \
+			*(v3 *)(&vertices[vertI+vertexStride*n+ 0]) = v3_add(center, hexVerts[i]); \
+			*(v3 *)(&vertices[vertI+vertexStride*n+12]) = normal; \
+			*(u8 *)(&vertices[vertI+vertexStride*n+24]) = colorR; \
+			*(u8 *)(&vertices[vertI+vertexStride*n+25]) = colorG; \
+			*(u8 *)(&vertices[vertI+vertexStride*n+26]) = colorB;
+
 #define EMIT_HEX_TRIANGLE(i0, i1, i2) \
-			vertices[vertI+0] = v3_add(center, hexVerts[i0]); \
-			vertices[vertI+1] = normal; \
-			vertices[vertI+2] = v3_add(center, hexVerts[i1]); \
-			vertices[vertI+3] = normal; \
-			vertices[vertI+4] = v3_add(center, hexVerts[i2]); \
-			vertices[vertI+5] = normal; \
-			vertI += 6;
+		EMIT_HEX_VERTEX(0, i0) \
+		EMIT_HEX_VERTEX(1, i1) \
+		EMIT_HEX_VERTEX(2, i2) \
+		vertI += 3*vertexStride;
 
 #define FLAG_SET(v, flag) ((v & flag) != 0)
 		if (FLAG_SET(visibleMask, NEIGHBOUR_MASK_NW)) {
@@ -657,12 +679,13 @@ chunkGenMesh(MaterialTable *materials, Chunk *cnk)
 		}
 #undef FLAG_SET
 	}
-	assert(vertI == (3+3) * numTriangles);
+	assert(vertI == vertexStride * 3 * numTriangles);
 
 #undef EMIT_HEX_TRIANGLE
 
 	free(solidMask);
 	free(cullMask);
+	free(tileColor);
 	free(neighbourMasks);
 
 	Mesh mesh = {0};
@@ -675,12 +698,18 @@ chunkGenMesh(MaterialTable *materials, Chunk *cnk)
 	glBindVertexArray(mesh.vao);
 	glBindBuffer(GL_ARRAY_BUFFER, mesh.vbo);
 
-	glBufferData(GL_ARRAY_BUFFER, numTriangles * 2*3*sizeof(v3), vertices, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, numTriangles * 3*vertexStride, vertices, GL_STATIC_DRAW);
 
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 2*sizeof(v3), 0);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 2*sizeof(v3), (void*)(sizeof(v3)));
+	// Position
+	glVertexAttribPointer(0, 3, GL_FLOAT,         GL_FALSE, vertexStride, 0);
+	// Normal
+	glVertexAttribPointer(1, 3, GL_FLOAT,         GL_FALSE, vertexStride, (void*)(sizeof(v3)));
+	// Colour
+	glVertexAttribPointer(2, 3, GL_UNSIGNED_BYTE, GL_TRUE,  vertexStride, (void*)(sizeof(v3)*2));
+
 	glEnableVertexAttribArray(0);
 	glEnableVertexAttribArray(1);
+	glEnableVertexAttribArray(2);
 
 	glBindVertexArray(0);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);

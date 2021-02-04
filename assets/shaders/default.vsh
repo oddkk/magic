@@ -2,22 +2,20 @@
 
 layout(location=0) in vec3 inVec;
 layout(location=1) in vec3 inNormal;
+layout(location=2) in vec3 inColor;
 
 uniform mat4 cameraTransform;
-uniform vec3 worldLocation;
+uniform mat4 normalTransform;
+uniform mat4 worldTransform;
 
-out vec3 normal;
-
-mat4 matTranslate(vec3 v) {
-	return mat4(
-		1.0, 0.0, 0.0, v.x,
-		0.0, 1.0, 0.0, v.y,
-		0.0, 0.0, 1.0, v.z,
-		0.0, 0.0, 0.0, 1.0
-	);
-}
+varying vec3 normalInterp;
+varying vec3 vertPos;
+out vec3 color;
 
 void main() {
-	normal = inNormal;
-	gl_Position = vec4(inVec, 1.0) * matTranslate(worldLocation) * cameraTransform;
+	gl_Position = vec4(inVec, 1.0) * worldTransform * cameraTransform;
+	vec4 vertPos4 = vec4(inVec, 1.0) * worldTransform;
+	vertPos = vec3(vertPos4) / vertPos4.w;
+	normalInterp = vec3(vec4(inNormal, 0.0) * normalTransform);
+	color = inColor;
 }

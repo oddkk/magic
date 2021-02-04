@@ -175,10 +175,12 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
-	GLint inCameraTransform, inWorldLocation, inColor;
+	GLint inCameraTransform, inWorldTransform, inNormalTransform, inColor, inLightPos;
 	inCameraTransform = glGetUniformLocation(defaultShader, "cameraTransform");
-	inWorldLocation = glGetUniformLocation(defaultShader, "worldLocation");
+	inNormalTransform = glGetUniformLocation(defaultShader, "normalTransform");
+	inWorldTransform = glGetUniformLocation(defaultShader, "worldTransform");
 	inColor = glGetUniformLocation(defaultShader, "inColor");
+	inLightPos = glGetUniformLocation(defaultShader, "inLightPos");
 
 	Mesh chunkMesh = chunkGenMesh(&materialTable, &chunk);
 
@@ -214,7 +216,13 @@ int main(int argc, char *argv[])
 		);
 
 		cam.location = v3_add(chunkCenter, V3(
-			// 0.0f, 8.0f, 10.0f
+			0.0f, 8.0f, 10.0f
+			// cos(((float)tick / 480.0f) * 2 * M_PI) * 10.0f,
+			// 8.0f,
+			// sin(((float)tick / 480.0f) * 2 * M_PI) * 10.0f
+		));
+
+		v3 lightPos = v3_add(chunkCenter, V3(
 			cos(((float)tick / 480.0f) * 2 * M_PI) * 10.0f,
 			8.0f,
 			sin(((float)tick / 480.0f) * 2 * M_PI) * 10.0f
@@ -237,8 +245,17 @@ int main(int argc, char *argv[])
 			0.0f
 		);
 
-		glUniform3fv(inWorldLocation, 1, chunkLocation.m);
+		m4 worldTransform;
+		mat4_identity(worldTransform.m);
+		mat4_translate(worldTransform.m, worldTransform.m, chunkLocation.m);
+
+		m4 normalTransform;
+		mat4_identity(normalTransform.m);
+
+		glUniformMatrix4fv(inWorldTransform, 1, GL_TRUE, worldTransform.m);
 		glUniformMatrix4fv(inCameraTransform, 1, GL_TRUE, cameraTransform.m);
+		glUniformMatrix4fv(inNormalTransform, 1, GL_TRUE, normalTransform.m);
+		glUniform3fv(inLightPos, 1, lightPos.m);
 
 		glLineWidth(1.0f);
 
