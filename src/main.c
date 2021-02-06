@@ -34,7 +34,7 @@ static void glfwErrorCallback(int error, const char *msg) {
 }
 
 typedef struct {
-	RenderContext render;
+	struct render_context render;
 } WindowContext;
 
 void windowSizeCallback(GLFWwindow *win, int width, int height) {
@@ -64,12 +64,12 @@ int main(int argc, char *argv[])
 	struct arena arena = {0};
 	arena_init(&arena, &memory);
 
-	struct arena tmp_arena = {0};
-	arena_init(&tmp_arena, &memory);
+	struct arena transient = {0};
+	arena_init(&transient, &memory);
 
 	struct mgc_error_context err_ctx = {0};
 	err_ctx.string_arena = &arena;
-	err_ctx.transient_arena = &tmp_arena;
+	err_ctx.transient_arena = &transient;
 
 	struct arena atom_arena = {0};
 	arena_init(&atom_arena, &memory);
@@ -77,6 +77,10 @@ int main(int argc, char *argv[])
 	struct atom_table atom_table = {0};
 	atom_table.string_arena = &atom_arena;
 	atom_table_rehash(&atom_table, 64);
+
+	struct chunk_gen_mesh_buffer *mesh_gen_mem;
+	mesh_gen_mem = arena_alloc(&arena, sizeof(struct chunk_gen_mesh_buffer));
+
 
 	struct mgcd_world world = {0};
 	mgcd_world_init(&world, &memory);
@@ -88,7 +92,7 @@ int main(int argc, char *argv[])
 			&atom_table,
 			&memory,
 			&arena,
-			&tmp_arena,
+			&transient,
 			&err_ctx);
 
 	mgcd_resource_id test_shape_id;
@@ -142,7 +146,7 @@ int main(int argc, char *argv[])
 
 	printf("OpenGL %s\n", glGetString(GL_VERSION));
 
-	err = renderInitialize(&winCtx.render);
+	err = render_initialize(&winCtx.render);
 	if (err) {
 		return -1;
 	}
@@ -159,19 +163,19 @@ int main(int argc, char *argv[])
 
 	for (size_t i = 0; i < CHUNK_WIDTH*CHUNK_WIDTH*CHUNK_HEIGHT; i++) {
 		bool is_set = mgc_chunk_mask_geti(&chunk_mask, i);
-		chunk.tiles[i].material = is_set ? MAT_WOOD : MAT_AIR;
+		chunk.tiles[i].material = is_set ? (i % 2 == 0 ? MAT_WOOD : MAT_WATER) : MAT_AIR;
 	}
 
 	GLuint defaultVShader, defaultFShader;
-	defaultVShader = compileShaderFromFile("assets/shaders/default.vsh", GL_VERTEX_SHADER);
-	defaultFShader = compileShaderFromFile("assets/shaders/default.fsh", GL_FRAGMENT_SHADER);
+	defaultVShader = shader_compile_from_file("assets/shaders/default.vsh", GL_VERTEX_SHADER);
+	defaultFShader = shader_compile_from_file("assets/shaders/default.fsh", GL_FRAGMENT_SHADER);
 
 	GLuint defaultShader;
 	defaultShader = glCreateProgram();
 
 	glAttachShader(defaultShader, defaultVShader);
 	glAttachShader(defaultShader, defaultFShader);
-	if (!linkShaderProgram(defaultShader)) {
+	if (!shader_link(defaultShader)) {
 		return -1;
 	}
 
@@ -182,7 +186,7 @@ int main(int argc, char *argv[])
 	inColor = glGetUniformLocation(defaultShader, "inColor");
 	inLightPos = glGetUniformLocation(defaultShader, "inLightPos");
 
-	Mesh chunkMesh = chunkGenMesh(&materialTable, &chunk);
+	Mesh chunkMesh = chunk_gen_mesh(mesh_gen_mem, &materialTable, &chunk);
 
 	glEnable(GL_CULL_FACE);
 	glFrontFace(GL_CCW);
@@ -196,6 +200,14 @@ int main(int argc, char *argv[])
 
 	while (!glfwWindowShouldClose(win) && !shouldQuit) {
 		tick += 1;
+
+		// for (size_t i = 0; i < CHUNK_WIDTH*CHUNK_WIDTH*CHUNK_HEIGHT; i++) {
+		// 	MaterialId mat = ((i / (CHUNK_WIDTH*CHUNK_WIDTH)) % 2) ? MAT_WOOD : MAT_WATER;
+		// 	chunk.tiles[i].material = (tick & (1 << (i % 64))) ? mat : MAT_AIR;
+		// }
+
+		// Mesh chunkMesh = chunk_gen_mesh(&materialTable, &chunk);
+
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		int width, height;
@@ -271,5 +283,6 @@ int main(int argc, char *argv[])
 
 	signal(SIGINT, SIG_DFL);
 
+	atom_table_destroy(&atom_table);
 	mgc_memory_destroy(&memory);
 }

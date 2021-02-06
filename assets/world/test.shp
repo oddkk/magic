@@ -8,4 +8,4 @@ cell (1, 0, 0);
 cell (1, 1, 0);
 cell (1, 1, 1);
 
-hexagon (8, 8, 0) 3 4;
+hexagon (8, 8, 0) 3 5;

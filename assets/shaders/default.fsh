@@ -11,7 +11,7 @@ const vec3 lightColor = vec3(1);
 const vec3 ambientLightColor = vec3(0.05);
 const float lightPower = 80.0;
 const vec3 specularColor = vec3(0.5);
-const float shininess = 16.0;
+const float shininess = 128; // 16.0;
 const float screenGamma = 2.2;
 
 void main() {
@@ -44,4 +44,5 @@ void main() {
 	vec3 colorGammaCorrected = pow(colorLinear, vec3(1.0 / screenGamma));
 
 	outColor = vec4(colorGammaCorrected, 1.0);
+	// outColor = vec4(specular, lambertian, 0, 0);
 }

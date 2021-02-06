@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-GLuint compileShader(char *shaderCode, size_t codeLength, GLenum type) {
+GLuint shader_compile(char *shaderCode, size_t codeLength, GLenum type) {
 	GLuint shader;
 	shader = glCreateShader(type);
 
@@ -41,7 +41,7 @@ GLuint compileShader(char *shaderCode, size_t codeLength, GLenum type) {
 }
 
 GLuint
-compileShaderFromFile(const char *file, GLenum type)
+shader_compile_from_file(const char *file, GLenum type)
 {
 	FILE *fp = fopen(file, "rb");
 	if (!fp) {
@@ -59,13 +59,13 @@ compileShaderFromFile(const char *file, GLenum type)
 		perror("read shader");
 	}
 
-	GLuint shader = compileShader(buffer, length, type);
+	GLuint shader = shader_compile(buffer, length, type);
 	free(buffer);
 
 	return shader;
 }
 
-bool linkShaderProgram(GLuint program) {
+bool shader_link(GLuint program) {
 	GLint link_status;
 
 	glLinkProgram(program);
@@ -91,7 +91,7 @@ bool linkShaderProgram(GLuint program) {
 }
 
 int
-renderInitialize(RenderContext *ctx)
+render_initialize(struct render_context *ctx)
 {
 	glGenVertexArrays(1, &ctx->hex.vao);
 	glBindVertexArray(ctx->hex.vao);
@@ -171,12 +171,12 @@ renderInitialize(RenderContext *ctx)
 	ctx->shader.id = glCreateProgram();
 	GLuint vShader, fShader;
 
-	vShader = compileShaderFromFile("assets/shaders/2dmap.vsh", GL_VERTEX_SHADER);
-	fShader = compileShaderFromFile("assets/shaders/2dmap.fsh", GL_FRAGMENT_SHADER);
+	vShader = shader_compile_from_file("assets/shaders/2dmap.vsh", GL_VERTEX_SHADER);
+	fShader = shader_compile_from_file("assets/shaders/2dmap.fsh", GL_FRAGMENT_SHADER);
 
 	glAttachShader(ctx->shader.id, vShader);
 	glAttachShader(ctx->shader.id, fShader);
-	if (!linkShaderProgram(ctx->shader.id)) {
+	if (!shader_link(ctx->shader.id)) {
 		return -1;
 	}
 
@@ -193,92 +193,8 @@ renderInitialize(RenderContext *ctx)
 }
 
 void
-renderTeardown(RenderContext *ctx)
+render_teardown(struct render_context *ctx)
 {
-}
-
-Color
-tileColor(MaterialTable *mats, Tile *tile)
-{
-	Material *mat = getMaterial(mats, tile->material);
-	return mat->color;
-}
-
-void
-renderChunk(RenderContext *ctx, Camera cam, Chunk *chunk)
-{
-	const float hexSize = 50.0f;
-
-	float offsetX = -(
-			cam.location.x * hexStrideX +
-			cam.location.y * hexStaggerX);
-	float offsetY = -(
-			cam.location.y * hexStrideY);
-
-	glUseProgram(ctx->shader.id);
-	glBindVertexArray(ctx->hex.vao);
-
-	glUniform2f(
-		ctx->shader.inScale,
-		cam.zoom * hexSize / ((float)ctx->screenSize.x / 2.0f),
-		cam.zoom * hexSize / ((float)ctx->screenSize.y / 2.0f)
-	);
-
-	// Draw grid
-	glLineWidth(1.0f);
-	glUniform3f(ctx->shader.inColor, 0.0f, 0.0f, 0.0f);
-	for (unsigned int y = 0; y < CHUNK_WIDTH; y++) {
-		for (unsigned int x = 0; x < CHUNK_WIDTH; x++) {
-			Tile *tile = &chunk->tiles[y*CHUNK_WIDTH+x];
-			{
-				v2 p = gridDrawCoord(V2i(
-						(chunk->location.x * CHUNK_WIDTH) + (int)x,
-						(chunk->location.y * CHUNK_WIDTH) + (int)y));
-
-				glUniform2f(ctx->shader.inPosition,
-						offsetX + p.x,
-						offsetY + p.y);
-				glUniform2f(ctx->shader.inSize, 1.0f, 1.0f);
-				glUniform1f(ctx->shader.inZOffset, 0.0f);
-
-				Color color = tileColor(ctx->materials, tile);
-				glUniform3f(
-						ctx->shader.inColor,
-						(float)color.r / 255.0f,
-						(float)color.g / 255.0f,
-						(float)color.b / 255.0f
-						);
-
-				glDrawElements(
-						GL_TRIANGLES, ctx->hex.elementBufferLength,
-						GL_UNSIGNED_INT, NULL);
-
-				glUniform3f(ctx->shader.inColor, 0.8f, 0.8f, 0.8f);
-
-				glDrawArrays(GL_LINE_LOOP, 0, 6);
-			}
-
-			/*
-			if (tile->occupant != nullptr) {
-				Entity *entity = tile->occupant;
-
-				glUniform2f(ctx->shader.inSize, 0.5f, 0.5f);
-				glUniform1f(ctx->shader.inZOffset, 0.1f);
-				glUniform3f(
-						ctx->shader.inColor,
-						(float)entity->r / 255.0f,
-						(float)entity->g / 255.0f,
-						(float)entity->b / 255.0f
-						);
-
-				glBindVertexArray(quadVAO);
-				glDrawArrays(GL_TRIANGLES, 0, 6);
-				glBindVertexArray(hexVao);
-			}
-			*/
-
-		}
-	}
 }
 
 typedef enum {
@@ -303,20 +219,7 @@ typedef enum {
 	NEIGHBOUR_MASK_BELOW = (1<<NEIGHBOUR_BELOW),
 } LayerNeighbourNameMask;
 
-
-#define LAYER_MASK_UNITS ((CHUNK_LAYER_NUM_TILES + (sizeof(u64)*8)-1) / (sizeof(u64)*8))
-typedef struct {
-	u8 layerId;
-	u64 nw[LAYER_MASK_UNITS];
-	u64 ne[LAYER_MASK_UNITS];
-	u64 w[LAYER_MASK_UNITS];
-	u64 e[LAYER_MASK_UNITS];
-	u64 sw[LAYER_MASK_UNITS];
-	u64 se[LAYER_MASK_UNITS];
-
-	u64 above[LAYER_MASK_UNITS];
-	u64 below[LAYER_MASK_UNITS];
-} LayerNeighbours;
+#define BITS_PER_UNIT (sizeof(u64)*8)
 
 static inline bool
 bitfieldIndexed(u64 *bitfield, size_t i)
@@ -334,7 +237,7 @@ cullMaskFromNeighbour(size_t i, LayerNeighbourName neighbour, u64 *neighbourMask
 }
 
 void
-chunkLayerCullMask(u8 *cullMask, LayerNeighbours *neighbours)
+chunkLayerCullMask(u8 *cullMask, struct layer_neighbours *neighbours)
 {
 	for (size_t i = 0; i < CHUNK_LAYER_NUM_TILES; i++) {
 		cullMask[i] =
@@ -349,76 +252,26 @@ chunkLayerCullMask(u8 *cullMask, LayerNeighbours *neighbours)
 	}
 }
 
-#if 0
-static void
-printTileLayerMask(u64 *mask)
-{
-	const size_t bitsPerUnit = sizeof(u64)*8;
-
-	for (size_t z = 0; z < CHUNK_WIDTH; z++) {
-		for (size_t i = 0; i < CHUNK_WIDTH-(z+1); i++) {
-			printf(" ");
-		}
-		for (size_t x = 0; x < CHUNK_WIDTH; x++) {
-			size_t idx = x + (CHUNK_WIDTH-z-1) * CHUNK_WIDTH;
-			u64 unit = mask[idx / bitsPerUnit];
-			bool set = !!((1ULL << (idx % bitsPerUnit)) & unit);
-			printf("%c ", set ? '#' : '.');
-		}
-		printf("\n");
-	}
-}
-
-const char *boxDrawing[] = {
-	"▖",
-	"▗",
-	"▘",
-	"▝",
-
-	" ",
-	"▏",
-	"▕",
-	"▔",
-	"▁",
-};
-
-static void
-printTileLayerCullMask(u8 *mask)
-{
-	for (size_t z = 0; z < CHUNK_WIDTH; z++) {
-		for (size_t i = 0; i < CHUNK_WIDTH-(z+1); i++) {
-			printf("  ");
-		}
-		for (size_t x = 0; x < CHUNK_WIDTH; x++) {
-			size_t idx = x + (CHUNK_WIDTH-z-1) * CHUNK_WIDTH;
-			u8 unit = mask[idx];
-			printf("%02x  ", unit);
-		}
-		printf("\n");
-	}
-}
-#endif
-
 static inline u64
 tilesMaskMove(u64 *mask, size_t i, i64 movement)
 {
 	u64 base = mask[i];
-	const size_t bitsPerUnit = (sizeof(u64)*8);
+
 	if (movement >= 0) {
-		const size_t unitsPerLayer = CHUNK_LAYER_NUM_TILES / bitsPerUnit;
+		const size_t unitsPerLayer = CHUNK_LAYER_NUM_TILES / BITS_PER_UNIT;
 		u64 high = (i < (unitsPerLayer-1)) ? mask[i+1] : 0;
-		u64 result = ((base >> movement) | (high << (bitsPerUnit - movement)));
+		u64 result = ((base >> movement) | (high << (BITS_PER_UNIT - movement)));
 		return result;
 	} else {
 		movement = -movement;
 		u64 low = (i > 0) ? mask[i-1] : 0;
-		u64 result = ((base << movement) | (low >> (bitsPerUnit - movement)));
+		u64 result = ((base << movement) | (low >> (BITS_PER_UNIT - movement)));
 		return result;
 	}
 }
 
 size_t
-u8CountSetBits(u8 v)
+count_set_bits_u8(u8 v)
 {
 #if 1
 	return __builtin_popcount(v);
@@ -433,41 +286,39 @@ u8CountSetBits(u8 v)
 }
 
 Mesh
-chunkGenMesh(MaterialTable *materials, Chunk *cnk)
+chunk_gen_mesh(struct chunk_gen_mesh_buffer *buffer, MaterialTable *materials, Chunk *cnk)
 {
-	const size_t bitsPerUnit = sizeof(u64)*8;
+	memset(buffer, 0, sizeof(struct chunk_gen_mesh_buffer));
 
 	// We assume the number of tiles is a multiple of 64.
-	u64 *solidMask;
-	solidMask = calloc(sizeof(u64), CHUNK_NUM_TILES / bitsPerUnit);
+	u64 *solidMask = buffer->solidMask;
 
 	// [nw, ne, w, e, sw, se, above, below] for each tile.
-	u8 *cullMask = calloc(sizeof(u8), 8*CHUNK_NUM_TILES);
+	u8 *cullMask = buffer->cullMask;
 
-	u8 *tileColor;
-	tileColor = calloc(sizeof(u8), CHUNK_NUM_TILES * 3);
+	u8 *tileColor = buffer->tileColor;
 
-	LayerNeighbours *neighbourMasks = calloc(sizeof(LayerNeighbours), 3);
+	struct layer_neighbours *neighbourMasks = buffer->neighbourMasks;
 
 	for (size_t i = 0; i < CHUNK_NUM_TILES; i++) {
 		Tile *tile = &cnk->tiles[i];
 		Material *mat = getMaterial(materials, tile->material);
-		solidMask[i/bitsPerUnit] |= (mat->solid ? 1ULL : 0ULL) << (i % bitsPerUnit);
+		solidMask[i/BITS_PER_UNIT] |= (mat->solid ? 1ULL : 0ULL) << (i % BITS_PER_UNIT);
 
-		tileColor[i*3+0] = 255;
-		tileColor[i*3+1] = 0;
-		tileColor[i*3+2] = 0;
+		tileColor[i*3+0] = mat->color.r;
+		tileColor[i*3+1] = mat->color.g;
+		tileColor[i*3+2] = mat->color.b;
 	}
 
-	LayerNeighbours *prev, *curr, *next;
+	struct layer_neighbours *prev, *curr, *next;
 	prev = &neighbourMasks[0];
 	curr = &neighbourMasks[1];
 	next = &neighbourMasks[2];
 
 	for (size_t y = 0; y < CHUNK_HEIGHT; y++) {
-		u64 *layerSolidMask = &solidMask[y*CHUNK_LAYER_NUM_TILES/bitsPerUnit];
+		u64 *layerSolidMask = &solidMask[y*CHUNK_LAYER_NUM_TILES/BITS_PER_UNIT];
 
-		for (size_t i = 0; i < CHUNK_LAYER_NUM_TILES / bitsPerUnit; i++) {
+		for (size_t i = 0; i < CHUNK_LAYER_NUM_TILES / BITS_PER_UNIT; i++) {
 			prev->above[i] |= layerSolidMask[i];
 			next->below[i] |= layerSolidMask[i];
 
@@ -509,27 +360,9 @@ chunkGenMesh(MaterialTable *materials, Chunk *cnk)
 			u8 *prevLayerCullMask = &cullMask[(y-1)*CHUNK_LAYER_NUM_TILES];
 			chunkLayerCullMask(prevLayerCullMask, prev);
 		}
-#if 0
-		if (y == 0) {
-			printf("solid\n");
-			printTileLayerMask(layerSolidMask);
-			printf("nw\n");
-			printTileLayerMask(curr->nw);
-			printf("ne\n");
-			printTileLayerMask(curr->ne);
-			printf("w\n");
-			printTileLayerMask(curr->w);
-			printf("e\n");
-			printTileLayerMask(curr->e);
-			printf("sw\n");
-			printTileLayerMask(curr->sw);
-			printf("se\n");
-			printTileLayerMask(curr->se);
-		}
-#endif
 
-		LayerNeighbours *newLayer = prev;
-		memset(newLayer, 0, sizeof(LayerNeighbours));
+		struct layer_neighbours *newLayer = prev;
+		memset(newLayer, 0, sizeof(struct layer_neighbours));
 		newLayer->layerId = y + 1;
 
 		prev = curr;
@@ -540,13 +373,9 @@ chunkGenMesh(MaterialTable *materials, Chunk *cnk)
 	u8 *lastLayerCullMask = &cullMask[(CHUNK_HEIGHT-1)*CHUNK_LAYER_NUM_TILES];
 	chunkLayerCullMask(lastLayerCullMask, prev);
 
-#if 0
-	printTileLayerCullMask(cullMask);
-#endif
-
 	size_t numTriangles = 0;
 	for (size_t i = 0; i < CHUNK_NUM_TILES; i++) {
-		bool solid = !!(solidMask[i / bitsPerUnit] & (1ULL << (i % bitsPerUnit)));
+		bool solid = !!(solidMask[i / BITS_PER_UNIT] & (1ULL << (i % BITS_PER_UNIT)));
 		if (!solid) {
 			continue;
 		}
@@ -558,8 +387,8 @@ chunkGenMesh(MaterialTable *materials, Chunk *cnk)
 		u8 quadFaces = visibleFaces & 0xc0;
 		u8 hexFaces  = visibleFaces & 0x3f;
 
-		numTriangles += u8CountSetBits(quadFaces >> 6) * 4;
-		numTriangles += u8CountSetBits(hexFaces)       * 2;
+		numTriangles += count_set_bits_u8(quadFaces >> 6) * 4;
+		numTriangles += count_set_bits_u8(hexFaces)       * 2;
 	}
 
 	const f32 normalX = sin(30.0 * M_PI / 180.0);
@@ -590,7 +419,7 @@ chunkGenMesh(MaterialTable *materials, Chunk *cnk)
 
 	size_t vertI = 0;
 	for (size_t i = 0; i < CHUNK_NUM_TILES; i++) {
-		bool solid = !!(solidMask[i / bitsPerUnit] & (1ULL << (i % bitsPerUnit)));
+		bool solid = !!(solidMask[i / BITS_PER_UNIT] & (1ULL << (i % BITS_PER_UNIT)));
 		if (!solid || cullMask[i] == 0xff) {
 			continue;
 		}
@@ -683,11 +512,6 @@ chunkGenMesh(MaterialTable *materials, Chunk *cnk)
 
 #undef EMIT_HEX_TRIANGLE
 
-	free(solidMask);
-	free(cullMask);
-	free(tileColor);
-	free(neighbourMasks);
-
 	Mesh mesh = {0};
 
 	mesh.numVertices = vertI;
@@ -715,79 +539,6 @@ chunkGenMesh(MaterialTable *materials, Chunk *cnk)
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 	free(vertices);
-
-	/*
-	v3 vertecies[] = {
-		V3(0.0f,     hexH, hexR),
-		V3(xOffset,  hexH, yOffset),
-		V3(xOffset,  hexH, -yOffset),
-		V3(0.0f,     hexH, -hexR),
-		V3(-xOffset, hexH, -yOffset),
-		V3(-xOffset, hexH,  yOffset),
-
-		V3(0.0f,     0.0f, hexR),
-		V3(xOffset,  0.0f, yOffset),
-		V3(xOffset,  0.0f, -yOffset),
-		V3(0.0f,     0.0f, -hexR),
-		V3(-xOffset, 0.0f, -yOffset),
-		V3(-xOffset, 0.0f,  yOffset),
-	};
-
-	u32 elements[] = {
-		// Top
-		0,  2,  1,
-		0,  3,  2,
-		0,  4,  3,
-		0,  5,  4,
-
-		// Bottom
-		6,  7,  8,
-		6,  8,  9,
-		6,  9, 10,
-		6, 10, 11,
-
-		// Sides
-		0,  7,  6,
-		0,  1,  7,
-              
-		1,  8,  7,
-		1,  2,  8,
-              
-		2,  9,  8,
-		2,  3,  9,
-              
-		3, 10,  9,
-		3,  4, 10,
-              
-		4, 11, 10,
-		4,  5, 11,
-              
-		5,  6, 11,
-		5,  0,  6,
-	};
-
-	Mesh mesh = {0};
-
-	mesh.veoLength = sizeof(elements) / sizeof(u32);
-
-	glGenVertexArrays(1, &mesh.vao);
-	glGenBuffers(1, &mesh.vbo);
-	glGenBuffers(1, &mesh.veo);
-
-	glBindVertexArray(mesh.vao);
-	glBindBuffer(GL_ARRAY_BUFFER, mesh.vbo);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.veo);
-
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertecies), vertecies, GL_STATIC_DRAW);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(elements), elements, GL_STATIC_DRAW);
-
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-	glEnableVertexAttribArray(0);
-
-	glBindVertexArray(0);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-	*/
 
 	return mesh;
 }
