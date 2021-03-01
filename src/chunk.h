@@ -4,6 +4,7 @@
 #include "material.h"
 #include "tile.h"
 #include "math.h"
+#include "config.h"
 
 /*
 // Tiles are hexagons, while chunks are diamond-shaped to fit together in the
@@ -25,14 +26,6 @@
 //          z         w
 */
 
-
-
-
-#define CHUNK_WIDTH 16
-#define CHUNK_HEIGHT 16
-#define CHUNK_LAYER_NUM_TILES (CHUNK_WIDTH*CHUNK_WIDTH)
-#define CHUNK_NUM_TILES (CHUNK_LAYER_NUM_TILES*CHUNK_HEIGHT)
-
 _Static_assert(CHUNK_LAYER_NUM_TILES % (sizeof(u64)*8) == 0, "Layer size must be a multiple of 64.");
 _Static_assert((sizeof(u64)*8) % CHUNK_WIDTH == 0, "Layer width must be a multiple of 64.");
 
@@ -43,12 +36,11 @@ struct mgc_chunk {
 	// column-major
 	Tile tiles[CHUNK_NUM_TILES];
 };
-typedef struct mgc_chunk Chunk;
 
 size_t
 chunkCoordToIndex(v3i coord);
 
 Tile *
-chunkTile(Chunk *, v3i localCoord);
+chunkTile(struct mgc_chunk *, v3i localCoord);
 
 #endif

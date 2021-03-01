@@ -9,7 +9,7 @@ chunkCoordToIndex(v3i coord)
 }
 
 Tile *
-chunkTile(Chunk *cnk, v3i localCoord)
+chunkTile(struct mgc_chunk *cnk, v3i localCoord)
 {
 	return &cnk->tiles[chunkCoordToIndex(localCoord)];
 }

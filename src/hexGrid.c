@@ -22,3 +22,15 @@ gridDrawCoord(v2i p)
 
 	return res;
 }
+
+v3
+mgc_grid_draw_coord(v3i p)
+{
+	v3 res;
+
+	res.x = p.x * hexStrideX + p.z * hexStaggerX;
+	res.y = p.y * hexH;
+	res.z = p.z * hexStrideY;
+
+	return res;
+}

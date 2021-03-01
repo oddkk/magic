@@ -5,16 +5,18 @@
 #include "chunk.h"
 #include "math.h"
 
+#include "mesh.h"
+
+/*
+struct render_op {
+	enum render_op_type type;
+};
+*/
+
 typedef struct {
 	v3 location;
 	float zoom;
 } Camera;
-
-typedef struct {
-	GLuint vao, vbo; //, veo;
-	// u32 veoLength;
-	u32 numVertices;
-} Mesh;
 
 struct render_context {
 	struct {
@@ -87,7 +89,7 @@ struct chunk_gen_mesh_buffer {
 #undef BITS_PER_UNIT
 
 
-Mesh
-chunk_gen_mesh(struct chunk_gen_mesh_buffer *buffer, MaterialTable *materials, Chunk *cnk);
+struct mgc_mesh
+chunk_gen_mesh(struct chunk_gen_mesh_buffer *buffer, MaterialTable *materials, struct mgc_chunk *cnk);
 
 #endif

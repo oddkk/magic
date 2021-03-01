@@ -285,8 +285,8 @@ count_set_bits_u8(u8 v)
 #endif
 }
 
-Mesh
-chunk_gen_mesh(struct chunk_gen_mesh_buffer *buffer, MaterialTable *materials, Chunk *cnk)
+struct mgc_mesh
+chunk_gen_mesh(struct chunk_gen_mesh_buffer *buffer, MaterialTable *materials, struct mgc_chunk *cnk)
 {
 	memset(buffer, 0, sizeof(struct chunk_gen_mesh_buffer));
 
@@ -512,7 +512,7 @@ chunk_gen_mesh(struct chunk_gen_mesh_buffer *buffer, MaterialTable *materials, C
 
 #undef EMIT_HEX_TRIANGLE
 
-	Mesh mesh = {0};
+	struct mgc_mesh mesh = {0};
 
 	mesh.numVertices = vertI;
 

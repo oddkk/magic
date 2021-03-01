@@ -6,6 +6,7 @@
 
 #include "hexGrid.h"
 #include "render.h"
+#include "chunk_cache.h"
 #include "intdef.h"
 
 #include "world_def/world_def.h"
@@ -155,7 +156,7 @@ int main(int argc, char *argv[])
 	initMaterialTable(&materialTable);
 	winCtx.render.materials = &materialTable;
 
-	Chunk chunk = {0};
+	struct mgc_chunk chunk = {0};
 	Camera cam = {0};
 
 	cam.zoom = 0.5f;
@@ -186,7 +187,7 @@ int main(int argc, char *argv[])
 	inColor = glGetUniformLocation(defaultShader, "inColor");
 	inLightPos = glGetUniformLocation(defaultShader, "inLightPos");
 
-	Mesh chunkMesh = chunk_gen_mesh(mesh_gen_mem, &materialTable, &chunk);
+	struct mgc_mesh chunkMesh = chunk_gen_mesh(mesh_gen_mem, &materialTable, &chunk);
 
 	glEnable(GL_CULL_FACE);
 	glFrontFace(GL_CCW);
@@ -198,15 +199,39 @@ int main(int argc, char *argv[])
 
 	int tick = 0;
 
+	struct mgc_chunk_cache chunk_cache = {0};
+	mgc_chunk_cache_init(&chunk_cache);
+
+	mgc_chunk_cache_request(&chunk_cache, V3i(0, 0, 0));
+	mgc_chunk_cache_request(&chunk_cache, V3i(0, 1, 0));
+	mgc_chunk_cache_request(&chunk_cache, V3i(0, -1, 0));
+	mgc_chunk_cache_request(&chunk_cache, V3i(1, 0, 0));
+	mgc_chunk_cache_request(&chunk_cache, V3i(-1, 0, 0));
+
+	struct mgc_chunk_render_entry *render_queue;
+	size_t render_queue_cap = 1024;
+
+	render_queue = calloc(sizeof(struct mgc_chunk_render_entry), render_queue_cap);
+
 	while (!glfwWindowShouldClose(win) && !shouldQuit) {
 		tick += 1;
+
+		mgc_chunk_cache_tick(&chunk_cache);
 
 		// for (size_t i = 0; i < CHUNK_WIDTH*CHUNK_WIDTH*CHUNK_HEIGHT; i++) {
 		// 	MaterialId mat = ((i / (CHUNK_WIDTH*CHUNK_WIDTH)) % 2) ? MAT_WOOD : MAT_WATER;
 		// 	chunk.tiles[i].material = (tick & (1 << (i % 64))) ? mat : MAT_AIR;
 		// }
 
-		// Mesh chunkMesh = chunk_gen_mesh(&materialTable, &chunk);
+		// struct mgc_mesh chunkMesh = chunk_gen_mesh(&materialTable, &chunk);
+
+		size_t render_queue_length = 0;
+		mgc_chunk_cache_make_render_queue(
+			&chunk_cache,
+			render_queue_cap,
+			render_queue,
+			&render_queue_length
+		);
 
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -251,31 +276,33 @@ int main(int argc, char *argv[])
 		glUseProgram(defaultShader);
 		glBindVertexArray(chunkMesh.vao);
 
-		v3 chunkLocation = V3(
-			0.0f,
-			0.0f,
-			0.0f
-		);
-
-		m4 worldTransform;
-		mat4_identity(worldTransform.m);
-		mat4_translate(worldTransform.m, worldTransform.m, chunkLocation.m);
-
 		m4 normalTransform;
 		mat4_identity(normalTransform.m);
-
-		glUniformMatrix4fv(inWorldTransform, 1, GL_TRUE, worldTransform.m);
 		glUniformMatrix4fv(inCameraTransform, 1, GL_TRUE, cameraTransform.m);
 		glUniformMatrix4fv(inNormalTransform, 1, GL_TRUE, normalTransform.m);
-		glUniform3fv(inLightPos, 1, lightPos.m);
 
-		glLineWidth(1.0f);
+		for (size_t queue_i = 0; queue_i < render_queue_length; queue_i++) {
+			struct mgc_chunk_render_entry *entry = &render_queue[queue_i];
+			v3i chunk_coord = entry->coord;
+			chunk_coord.x *= CHUNK_WIDTH;
+			chunk_coord.y *= CHUNK_HEIGHT;
+			chunk_coord.z *= CHUNK_WIDTH;
+			v3 chunk_location = mgc_grid_draw_coord(chunk_coord);
 
-		glUniform3f(inColor, 1.0f, 1.0f, 1.0f);
+			m4 worldTransform;
+			mat4_identity(worldTransform.m);
+			mat4_translate(worldTransform.m, worldTransform.m, chunk_location.m);
 
-		// glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+			glUniformMatrix4fv(inWorldTransform,  1, GL_TRUE, worldTransform.m);
+			glUniform3fv(inLightPos, 1, lightPos.m);
 
-		glDrawArrays(GL_TRIANGLES, 0, chunkMesh.numVertices);
+			glUniform3f(inColor, 1.0f, 1.0f, 1.0f);
+
+			// glLineWidth(1.0f);
+			// glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+			glDrawArrays(GL_TRIANGLES, 0, chunkMesh.numVertices);
+		}
 
 		glfwSwapBuffers(win);
 		glfwPollEvents();
@@ -283,6 +310,8 @@ int main(int argc, char *argv[])
 
 	signal(SIGINT, SIG_DFL);
 
+	free(render_queue);
+	free(chunk_cache.entries);
 	atom_table_destroy(&atom_table);
 	mgc_memory_destroy(&memory);
 }

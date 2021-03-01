@@ -19,4 +19,7 @@ hexGridInitialize();
 v2f
 gridDrawCoord(v2i);
 
+v3
+mgc_grid_draw_coord(v3i p);
+
 #endif
