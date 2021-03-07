@@ -53,6 +53,8 @@ struct mgcd_parser {
 
 	struct mgcd_token peek_buffer[1];
 	int peek_buffer_count;
+
+	mgcd_resource_id root_scope;
 };
 
 void
@@ -83,6 +85,9 @@ mgcd_try_get_path(struct mgcd_token tok, struct string *out_path);
 
 bool
 mgcd_expect_var_path(struct mgcd_parser *parser, struct string *out_path);
+
+bool
+mgcd_expect_var_resource(struct mgcd_parser *parser, MGCD_TYPE(mgcd_resource_id) *out);
 
 bool
 mgcd_expect_var_int(struct mgcd_parser *parser, MGCD_TYPE(int) *out);

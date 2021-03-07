@@ -59,7 +59,7 @@ mgcd_shape_op_print(struct mgcd_shape_op *op)
 static struct mgcd_shape_op *
 mgcd_alloc_shape_op(struct mgcd_parser *parser, struct mgcd_shape_op op)
 {
-	struct paged_list *shape_ops = &parser->ctx->world->shape_ops;
+	struct paged_list *shape_ops = &parser->ctx->shape_ops;
 
 	size_t new_op_id;
 	new_op_id = paged_list_push(shape_ops);

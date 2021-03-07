@@ -9,6 +9,8 @@
 #include "chunk_cache.h"
 #include "intdef.h"
 
+#include "world.h"
+
 #include "world_def/world_def.h"
 #include "world_def/shape.h"
 #include "world_def/lexer.h"
@@ -82,14 +84,21 @@ int main(int argc, char *argv[])
 	struct chunk_gen_mesh_buffer *mesh_gen_mem;
 	mesh_gen_mem = arena_alloc(&arena, sizeof(struct chunk_gen_mesh_buffer));
 
+	struct mgc_world_init_context world_init_context = {0};
+	world_init_context.atom_table = &atom_table;
+	world_init_context.memory = &memory;
+	world_init_context.world_arena = &arena;
+	world_init_context.transient_arena = &transient;
+	world_init_context.err = &err_ctx;
 
-	struct mgcd_world world = {0};
-	mgcd_world_init(&world, &memory);
+	struct mgc_world world = {0};
+	mgc_world_init_world_def(&world, &world_init_context);
 
+
+	/*
 	struct mgcd_context world_decl_ctx = {0};
 	mgcd_context_init(
 			&world_decl_ctx,
-			&world,
 			&atom_table,
 			&memory,
 			&arena,
@@ -118,6 +127,23 @@ int main(int argc, char *argv[])
 		test_shape
 	);
 
+	for (size_t i = 0; i < CHUNK_WIDTH*CHUNK_WIDTH*CHUNK_HEIGHT; i++) {
+		bool is_set = mgc_chunk_mask_geti(&chunk_mask, i);
+		chunk.tiles[i].material = is_set ? (i % 2 == 0 ? MAT_WOOD : MAT_WATER) : MAT_AIR;
+	}
+
+	struct mgc_mesh chunkMesh = chunk_gen_mesh(mesh_gen_mem, &mat_table, &chunk);
+
+	// struct mgc_chunk chunk = {0};
+
+	// for (size_t i = 0; i < CHUNK_WIDTH*CHUNK_WIDTH*CHUNK_HEIGHT; i++) {
+	// 	mgc_material_id mat = ((i / (CHUNK_WIDTH*CHUNK_WIDTH)) % 2) ? MAT_WOOD : MAT_WATER;
+	// 	chunk.tiles[i].material = (tick & (1 << (i % 64))) ? mat : MAT_AIR;
+	// }
+
+	// struct mgc_mesh chunkMesh = chunk_gen_mesh(&mat_table, &chunk);
+	*/
+
 	glfwSetErrorCallback(glfwErrorCallback);
 
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
@@ -126,7 +152,7 @@ int main(int argc, char *argv[])
 	glfwWindowHint(GLFW_SAMPLES, 4);
 
 	WindowContext winCtx = {0};
-	winCtx.render.screenSize.x  = 800;
+	winCtx.render.screenSize.x = 800;
 	winCtx.render.screenSize.y = 800;
 
 	GLFWwindow *win;
@@ -152,20 +178,14 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
-	MaterialTable materialTable = {0};
-	initMaterialTable(&materialTable);
-	winCtx.render.materials = &materialTable;
+	struct mgc_material_table mat_table = {0};
+	initMaterialTable(&mat_table);
+	winCtx.render.materials = &mat_table;
 
-	struct mgc_chunk chunk = {0};
 	Camera cam = {0};
 
 	cam.zoom = 0.5f;
 	cam.location = V3(2.0f, 2.0f, 2.0f);
-
-	for (size_t i = 0; i < CHUNK_WIDTH*CHUNK_WIDTH*CHUNK_HEIGHT; i++) {
-		bool is_set = mgc_chunk_mask_geti(&chunk_mask, i);
-		chunk.tiles[i].material = is_set ? (i % 2 == 0 ? MAT_WOOD : MAT_WATER) : MAT_AIR;
-	}
 
 	GLuint defaultVShader, defaultFShader;
 	defaultVShader = shader_compile_from_file("assets/shaders/default.vsh", GL_VERTEX_SHADER);
@@ -187,8 +207,6 @@ int main(int argc, char *argv[])
 	inColor = glGetUniformLocation(defaultShader, "inColor");
 	inLightPos = glGetUniformLocation(defaultShader, "inLightPos");
 
-	struct mgc_mesh chunkMesh = chunk_gen_mesh(mesh_gen_mem, &materialTable, &chunk);
-
 	glEnable(GL_CULL_FACE);
 	glFrontFace(GL_CCW);
 	glCullFace(GL_FRONT);
@@ -200,7 +218,7 @@ int main(int argc, char *argv[])
 	int tick = 0;
 
 	struct mgc_chunk_cache chunk_cache = {0};
-	mgc_chunk_cache_init(&chunk_cache);
+	mgc_chunk_cache_init(&chunk_cache, &world, &mat_table);
 
 	mgc_chunk_cache_request(&chunk_cache, V3i(0, 0, 0));
 	mgc_chunk_cache_request(&chunk_cache, V3i(0, 1, 0));
@@ -217,13 +235,6 @@ int main(int argc, char *argv[])
 		tick += 1;
 
 		mgc_chunk_cache_tick(&chunk_cache);
-
-		// for (size_t i = 0; i < CHUNK_WIDTH*CHUNK_WIDTH*CHUNK_HEIGHT; i++) {
-		// 	MaterialId mat = ((i / (CHUNK_WIDTH*CHUNK_WIDTH)) % 2) ? MAT_WOOD : MAT_WATER;
-		// 	chunk.tiles[i].material = (tick & (1 << (i % 64))) ? mat : MAT_AIR;
-		// }
-
-		// struct mgc_mesh chunkMesh = chunk_gen_mesh(&materialTable, &chunk);
 
 		size_t render_queue_length = 0;
 		mgc_chunk_cache_make_render_queue(
@@ -274,7 +285,6 @@ int main(int argc, char *argv[])
 		mat4_multiply(cameraTransform.m, perspective.m, camera.m);
 
 		glUseProgram(defaultShader);
-		glBindVertexArray(chunkMesh.vao);
 
 		m4 normalTransform;
 		mat4_identity(normalTransform.m);
@@ -289,6 +299,8 @@ int main(int argc, char *argv[])
 			chunk_coord.z *= CHUNK_WIDTH;
 			v3 chunk_location = mgc_grid_draw_coord(chunk_coord);
 
+			glBindVertexArray(entry->mesh.vao);
+
 			m4 worldTransform;
 			mat4_identity(worldTransform.m);
 			mat4_translate(worldTransform.m, worldTransform.m, chunk_location.m);
@@ -301,7 +313,7 @@ int main(int argc, char *argv[])
 			// glLineWidth(1.0f);
 			// glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
-			glDrawArrays(GL_TRIANGLES, 0, chunkMesh.numVertices);
+			glDrawArrays(GL_TRIANGLES, 0, entry->mesh.numVertices);
 		}
 
 		glfwSwapBuffers(win);

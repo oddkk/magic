@@ -127,6 +127,25 @@ mgcd_expect_var_path(struct mgcd_parser *parser, struct string *out_path)
 }
 
 bool
+mgcd_expect_var_resource(struct mgcd_parser *parser, MGCD_TYPE(mgcd_resource_id) *out)
+{
+	struct mgcd_token tok;
+	tok = mgcd_peek_token(parser);
+	struct string path = {0};
+	if (mgcd_try_get_path(tok, &path)) {
+		mgcd_resource_id result;
+		result = mgcd_request_resource_str(parser->ctx, parser->root_scope, path);
+
+		if (result >= 0) {
+			*out = mgcd_var_lit_mgcd_resource_id(result);
+			return true;
+		}
+	}
+
+	return false;
+}
+
+bool
 mgcd_expect_var_int(struct mgcd_parser *parser, MGCD_TYPE(int) *out)
 {
 	struct mgcd_token tok;

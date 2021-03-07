@@ -1,0 +1,4 @@
+#version 0.1
+
+add /mat/wood /world/test (0,0,0) 5;
+

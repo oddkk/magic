@@ -31,15 +31,6 @@ mgcd_res_type_name(enum mgcd_entry_type type)
 	}
 }
 
-void
-mgcd_world_init(struct mgcd_world *world, struct mgc_memory *mem)
-{
-	paged_list_init(&world->shapes, mem,
-			sizeof(struct mgcd_shape_op));
-	paged_list_init(&world->shape_ops, mem,
-			sizeof(struct mgcd_shape_op));
-}
-
 static mgcd_resource_id
 mgcd_alloc_resource(struct mgcd_context *ctx)
 {
@@ -100,14 +91,12 @@ mgcd_path_get_asset_root(struct arena *mem, struct string *out)
 
 void
 mgcd_context_init(struct mgcd_context *ctx,
-		struct mgcd_world *world,
 		struct atom_table *atom_table,
 		struct mgc_memory *memory,
 		struct arena *mem,
 		struct arena *tmp_mem,
 		struct mgc_error_context *err)
 {
-	ctx->world = world;
 	ctx->atom_table = atom_table;
 	ctx->mem = mem;
 	ctx->tmp_mem = tmp_mem;
@@ -130,6 +119,9 @@ mgcd_context_init(struct mgcd_context *ctx,
 			sizeof(struct mgcd_resource));
 	paged_list_init(&ctx->resource_dependencies, memory,
 			sizeof(struct mgcd_resource_dependency));
+
+	paged_list_init(&ctx->shape_ops, memory,
+			sizeof(struct mgcd_shape_op));
 
 	ctx->root_scope = mgcd_alloc_resource(ctx);
 	struct mgcd_resource *root_resource;

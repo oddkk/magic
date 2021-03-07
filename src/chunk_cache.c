@@ -1,6 +1,8 @@
 #include "chunk_cache.h"
 #include "config.h"
 #include "utils.h"
+#include "world.h"
+#include "render.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -26,11 +28,14 @@ mgccc_debug_trace(v3i coord, const char *fmt, ...)
 #endif
 
 void
-mgc_chunk_cache_init(struct mgc_chunk_cache *cache)
+mgc_chunk_cache_init(struct mgc_chunk_cache *cache, struct mgc_world *world, struct mgc_material_table *mat_table)
 {
 	memset(cache, 0, sizeof(struct mgc_chunk_cache));
+	cache->world = world;
+	cache->mat_table = mat_table;
 	cache->cap_entries = MGC_CHUNK_CACHE_SIZE;
 	cache->entries = calloc(cache->cap_entries, sizeof(struct mgc_chunk_cache_entry));
+	cache->gen_mesh_buffer = calloc(1, sizeof(struct chunk_gen_mesh_buffer));
 }
 
 static ssize_t
@@ -96,12 +101,24 @@ mgc_chunk_cache_tick(struct mgc_chunk_cache *cache)
 	for (size_t entry_i = 0; entry_i < cache->head; entry_i++) {
 		struct mgc_chunk_cache_entry *entry = &cache->entries[entry_i];
 
+		int err;
+
 		switch (entry->state) {
 			case MGC_CHUNK_CACHE_UNUSED:
 				break;
 
 			case MGC_CHUNK_CACHE_UNLOADED:
 				mgccc_debug_trace(entry->coord, "Loading...");
+				err = mgc_world_load_chunk(cache->world, entry->chunk, entry->coord);
+				if (err < 0) {
+					entry->state = MGC_CHUNK_CACHE_FAILED;
+					mgccc_debug_trace(entry->coord, "Loading FAILED");
+					break;
+				} else if (err > 0) {
+					entry->state = MGC_CHUNK_CACHE_UNLOADED;
+					mgccc_debug_trace(entry->coord, "Loading YIELD");
+					break;
+				}
 				// TODO: Load chunk from world def and saved delta.
 				entry->state = MGC_CHUNK_CACHE_LOADED;
 				mgccc_debug_trace(entry->coord, "Loading OK");
@@ -111,11 +128,17 @@ mgc_chunk_cache_tick(struct mgc_chunk_cache *cache)
 			case MGC_CHUNK_CACHE_DIRTY:
 				mgccc_debug_trace(entry->coord, "Meshing...");
 				// TODO: Mesh
+				entry->mesh = chunk_gen_mesh(
+					cache->gen_mesh_buffer,
+					cache->mat_table,
+					entry->chunk
+				);
 				entry->state = MGC_CHUNK_CACHE_MESHED;
 				mgccc_debug_trace(entry->coord, "Meshing OK");
 				// fallthrough
 
 			case MGC_CHUNK_CACHE_MESHED:
+			case MGC_CHUNK_CACHE_FAILED:
 				break;
 		}
 	}
@@ -130,9 +153,16 @@ mgc_chunk_cache_make_render_queue(
 {
 	for (size_t i = 0; i < cache->head; i++) {
 		assert(*queue_head < queue_cap);
-		queue[*queue_head].mesh = cache->entries[i].mesh;
-		queue[*queue_head].coord = cache->entries[i].coord;
 
-		*queue_head += 1;
+		struct mgc_chunk_cache_entry *entry;
+		entry = &cache->entries[i];
+
+		if (entry->state == MGC_CHUNK_CACHE_MESHED ||
+			entry->state == MGC_CHUNK_CACHE_DIRTY) {
+			queue[*queue_head].mesh = entry->mesh;
+			queue[*queue_head].coord = entry->coord;
+
+			*queue_head += 1;
+		}
 	}
 }

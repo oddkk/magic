@@ -17,17 +17,9 @@ typedef int mgcd_shape_id;
 #define MGCD_RESOURCE_NONE ((mgcd_resource_id)-1)
 #define MGCD_FILE_NONE ((mgcd_file_id)-1)
 
-struct mgcd_world {
-	struct paged_list shapes;
-	struct paged_list shape_ops;
-};
-
 struct mgcd_version {
 	int major, minor;
 };
-
-void
-mgcd_world_init(struct mgcd_world *world, struct mgc_memory *mem);
 
 #define MGCD_ATOMS \
 	ATOM(shape) \
@@ -35,6 +27,8 @@ mgcd_world_init(struct mgcd_world *world, struct mgc_memory *mem);
 	ATOM(heightmap) \
 	ATOM(hexagon) \
 	ATOM(between) \
+	ATOM(add) \
+	ATOM(remove) \
 	ATOM(coord) \
 	ATOM(file) \
 	ATOM(center) \
@@ -110,7 +104,6 @@ struct mgcd_file {
 };
 
 struct mgcd_context {
-	struct mgcd_world *world;
 	struct mgcd_atoms atoms;
 
 	struct atom_table *atom_table;
@@ -126,6 +119,8 @@ struct mgcd_context {
 	struct paged_list resources;
 	struct paged_list resource_dependencies;
 
+	struct paged_list shape_ops;
+
 	mgcd_resource_id root_scope;
 
 	// This string is 0-terminated.
@@ -138,7 +133,6 @@ struct mgcd_context {
 
 void
 mgcd_context_init(struct mgcd_context *,
-		struct mgcd_world *world,
 		struct atom_table *atom_table,
 		struct mgc_memory *memory,
 		struct arena *mem,

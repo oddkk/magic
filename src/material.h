@@ -8,7 +8,7 @@
 typedef uint16_t TraitId;
 typedef uint16_t ActionId;
 typedef uint16_t StatusId;
-typedef uint16_t MaterialId;
+typedef uint16_t mgc_material_id;
 
 typedef enum {
 	TRAIT_GAS,
@@ -56,14 +56,14 @@ typedef enum {
 	MAT_METAL,
 } DeafultMaterialTypes;
 
-typedef struct {
+typedef struct mgc_material {
 	struct string name;
 	Color color;
 	bool solid;
 } Material;
 
 typedef struct {
-	MaterialId material;
+	mgc_material_id material;
 	TraitId trait;
 } MaterialTrait;
 
@@ -81,15 +81,15 @@ typedef struct {
 	TransitionType type;
 
 	union {
-		MaterialId materialTo;
+		mgc_material_id materialTo;
 		StatusId status;
 	};
 
 } MaterialTransition;
 
 
-typedef struct {
-	Material *materials;
+typedef struct mgc_material_table {
+	struct mgc_material *materials;
 	size_t numMaterials;
 } MaterialTable;
 
@@ -97,6 +97,6 @@ void
 initMaterialTable(MaterialTable *);
 
 Material *
-getMaterial(MaterialTable *, MaterialId);
+getMaterial(MaterialTable *, mgc_material_id);
 
 #endif

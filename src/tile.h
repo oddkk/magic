@@ -4,7 +4,7 @@
 #include "material.h"
 
 typedef struct {
-	MaterialId material;
+	mgc_material_id material;
 } Tile;
 
 #endif

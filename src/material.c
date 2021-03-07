@@ -54,7 +54,7 @@ initMaterialTable(MaterialTable *mats)
 }
 
 Material *
-getMaterial(MaterialTable *mats, MaterialId id)
+getMaterial(MaterialTable *mats, mgc_material_id id)
 {
 	assert(id < mats->numMaterials);
 	return &mats->materials[id];
