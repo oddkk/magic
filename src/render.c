@@ -286,7 +286,7 @@ count_set_bits_u8(u8 v)
 }
 
 struct mgc_mesh
-chunk_gen_mesh(struct chunk_gen_mesh_buffer *buffer, MaterialTable *materials, struct mgc_chunk *cnk)
+chunk_gen_mesh(struct chunk_gen_mesh_buffer *buffer, struct mgc_material_table *materials, struct mgc_chunk *cnk)
 {
 	memset(buffer, 0, sizeof(struct chunk_gen_mesh_buffer));
 
@@ -302,7 +302,7 @@ chunk_gen_mesh(struct chunk_gen_mesh_buffer *buffer, MaterialTable *materials, s
 
 	for (size_t i = 0; i < CHUNK_NUM_TILES; i++) {
 		Tile *tile = &cnk->tiles[i];
-		Material *mat = getMaterial(materials, tile->material);
+		Material *mat = mgc_mat_get(materials, tile->material);
 		solidMask[i/BITS_PER_UNIT] |= (mat->solid ? 1ULL : 0ULL) << (i % BITS_PER_UNIT);
 
 		tileColor[i*3+0] = mat->color.r;

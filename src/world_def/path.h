@@ -30,4 +30,7 @@ mgcd_path_make_abs(struct mgcd_context *ctx,
 void
 mgcd_path_print(struct mgcd_path *);
 
+struct string
+mgcd_path_to_string(struct arena *mem, struct mgcd_path *);
+
 #endif

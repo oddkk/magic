@@ -39,13 +39,17 @@ mgcd_print_token(struct mgcd_token *tok)
 			printf(" %.*s", LIT(tok->string_lit));
 			break;
 
-		case MGCD_TOK_FILE_PATH:
-			printf(" %.*s", LIT(tok->file_path));
-			break;
-
 		case MGCD_TOK_VERSION:
 			printf(" %i.%i", tok->version.major, tok->version.minor);
 			break;
+
+		case MGCD_TOK_PATH_SEG:
+			printf(" %.*s%s%s",
+					ALIT(tok->path_seg.ident),
+					(tok->path_seg.flags & MGCD_PATH_SEG_REL) ? " (rel)" : "",
+					(tok->path_seg.flags & MGCD_PATH_SEG_END) ? " (end)" : "");
+			break;
+
 		default:
 			break;
 	}
@@ -96,7 +100,8 @@ int
 mgcd_parse_open_file(
 		struct mgcd_lexer *lex,
 		struct mgcd_context *ctx,
-		char *file)
+		char *file,
+		file_id_t fid)
 {
 	memset(lex, 0, sizeof(struct mgcd_lexer));
 
@@ -119,6 +124,14 @@ mgcd_parse_open_file(
 	lex->buf_begin = 0;
 	lex->buf_end = 0;
 
+	lex->tok_loc.byte_from = 0;
+	lex->tok_loc.byte_to = 0;
+	lex->tok_loc.line_from = 0;
+	lex->tok_loc.line_to = 0;
+	lex->tok_loc.col_from = 0;
+	lex->tok_loc.col_to = 0;
+	lex->tok_loc.file_id = fid;
+
 	mgcd_parse_fill(lex, LEX_BUFFER_SIZE);
 
 	return 0;
@@ -128,6 +141,10 @@ static void
 mgcd_reset_token(struct mgcd_lexer *ctx)
 {
 	ctx->tok = ctx->cur;
+
+	ctx->tok_loc.byte_from = ctx->tok_loc.byte_to;
+	ctx->tok_loc.line_from = ctx->tok_loc.line_to;
+	ctx->tok_loc.col_from  = ctx->tok_loc.col_to;
 }
 
 int
@@ -139,8 +156,24 @@ mgcd_eat_n_char(struct mgcd_lexer *ctx, size_t n)
 		}
 	}
 
+	for (size_t i = 0; i < n; i++) {
+		ctx->tok_loc.byte_to += 1;
+		// TODO: UTF-8
+		ctx->tok_loc.col_to += 1;
+		if (ctx->cur[i] == '\n') {
+			ctx->tok_loc.line_to += 1;
+			ctx->tok_loc.col_to = 1;
+		}
+	}
+
 	ctx->cur += n;
-	return *ctx->cur;
+	int c = *ctx->cur;
+
+	// if (c == '\n') {
+	// 	ctx->tok_loc.byte_to += 1;
+	// }
+
+	return c;
 }
 
 int
@@ -315,13 +348,19 @@ mgcd_eat_rest_of_line(struct mgcd_lexer *ctx)
 }
 
 struct mgcd_token
+mgcd_simple_token(struct mgcd_lexer *ctx, enum mgcd_token_type type)
+{
+	struct mgcd_token token = {0};
+	token.type = type;
+	token.loc = ctx->tok_loc;
+	return token;
+}
+
+struct mgcd_token
 mgcd_eat_single_char_token(struct mgcd_lexer *ctx, enum mgcd_token_type type)
 {
 	mgcd_eat_n_char(ctx, 1);
-
-	struct mgcd_token token = {0};
-	token.type = type;
-	return token;
+	return mgcd_simple_token(ctx, type);
 }
 
 bool
@@ -352,7 +391,61 @@ mgcd_expect_version_num(struct mgcd_lexer *ctx,
 	out_version->major = string_to_int64_base10(major);
 	out_version->minor = string_to_int64_base10(minor);
 	return true;
+}
 
+struct mgcd_token
+mgcd_eat_path_seg(struct mgcd_lexer *ctx, enum mgcd_path_seg_flags flags)
+{
+	struct mgcd_token token = {0};
+
+	token.path_seg.flags = flags;
+
+	char sep = mgcd_peek_char(ctx);
+	assert(sep == '/');
+	mgcd_eat_n_char(ctx, 1);
+
+	int c = mgcd_peek_char(ctx);
+	if (char_is_alpha(c)) {
+		struct string token_string;
+		token_string = mgcd_eat_word_alphanum(ctx);
+
+		token.type = MGCD_TOK_PATH_SEG;
+		token.path_seg.ident = atom_create(ctx->atom_table, token_string);
+	} else if (c == '.') {
+		mgcd_eat_n_char(ctx, 1);
+
+		c = mgcd_peek_char(ctx);
+		if (c == '.') {
+			mgcd_eat_n_char(ctx, 1);
+			token.type = MGCD_TOK_PATH_SEG;
+			token.path_seg.ident = atom_create(ctx->atom_table, STR(".."));
+		} else if (c == '/') {
+			token.type = MGCD_TOK_PATH_SEG;
+		} else {
+			// TODO: Should this case be allowed?
+			// token.type = MGCD_TOK_PATH_SEG;
+			mgc_error(ctx->ctx->err, ctx->tok_loc,
+					"Cannot access path with trailing '/'.");
+			struct mgcd_token error_token = {0};
+			error_token.type = MGCD_TOK_ERROR;
+			mgcd_eat_n_char(ctx, 1);
+			return error_token;
+		}
+	} else if (c == '{') {
+		token.type = MGCD_TOK_PATH_OPEN_EXPR;
+		return token;
+	}
+
+	c = mgcd_peek_char(ctx);
+	if (c == '/') {
+		token.path_seg.flags &= ~MGCD_PATH_SEG_END;
+	} else {
+		token.path_seg.flags |= MGCD_PATH_SEG_END;
+	}
+
+	token.loc = ctx->tok_loc;
+
+	return token;
 }
 
 struct mgcd_token
@@ -378,16 +471,37 @@ mgcd_read_token(struct mgcd_lexer *ctx)
 				}
 
 			case '.':
+				mgcd_eat_n_char(ctx, 1);
+				switch (mgcd_peek_char(ctx)) {
+					case '/':
+						return mgcd_eat_path_seg(
+								ctx, MGCD_PATH_SEG_REL);
+
+					default:
+						// The '.' has already been eaten.
+						return mgcd_simple_token(
+								ctx, MGCD_TOK_ACCESS);
+				}
+
 			case '/':
-				break;
+				return mgcd_eat_path_seg(ctx, 0);
 
 			case '{':
 				return mgcd_eat_single_char_token(
 						ctx, MGCD_TOK_OPEN_BLOCK);
 
 			case '}':
-				return mgcd_eat_single_char_token(
-						ctx, MGCD_TOK_CLOSE_BLOCK);
+				{
+					mgcd_eat_n_char(ctx, 1);
+					c = mgcd_peek_char(ctx);
+					if (c == '/') {
+						return mgcd_simple_token(
+								ctx, MGCD_TOK_PATH_CLOSE_EXPR);
+					} else {
+						return mgcd_simple_token(
+								ctx, MGCD_TOK_CLOSE_BLOCK);
+					}
+				}
 
 			case '(':
 				return mgcd_eat_single_char_token(
@@ -471,13 +585,18 @@ mgcd_read_token(struct mgcd_lexer *ctx)
 				} else if (char_is_any_whitespace(c)) {
 					mgcd_eat_any_whitespace(ctx, false);
 					should_continue = true;
+				} else {
+					mgcd_eat_n_char(ctx, 1);
+					mgc_error(ctx->ctx->err, ctx->tok_loc,
+							"Unexpected character '%c' (%i)", c, c);
+					mgcd_reset_token(ctx);
+					should_continue = true;
 				}
 				break;
 		}
 	}
 
-	mgc_error(ctx->ctx->err, MGC_NO_LOC,
-			"Unexpected character %c (%i)", c, c);
+	panic("Unexpected end of token parser.");
 	struct mgcd_token eof_token = {0};
 	eof_token.type = MGCD_TOK_EOF;
 	return eof_token;

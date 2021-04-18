@@ -47,16 +47,28 @@ MaterialTransition defaultTraitTransitions[] = {
 };
 
 void
-initMaterialTable(MaterialTable *mats)
+mgc_material_table_init(struct mgc_material_table *mats)
 {
-	mats->numMaterials = sizeof(defaultMaterials) / sizeof(Material);
+	mats->num_materials = sizeof(defaultMaterials) / sizeof(Material);
 	mats->materials = defaultMaterials;
 }
 
 Material *
-getMaterial(MaterialTable *mats, mgc_material_id id)
+mgc_mat_get(struct mgc_material_table *mats, mgc_material_id id)
 {
-	assert(id < mats->numMaterials);
+	assert(id < mats->num_materials);
 	return &mats->materials[id];
 }
 
+bool
+mgc_material_lookup(struct mgc_material_table *mats, struct string name, mgc_material_id *out_id)
+{
+	for (size_t i = 0; i < mats->num_materials; i++) {
+		if (string_equal(mats->materials[i].name, name)) {
+			*out_id = i;
+			return true;
+		}
+	}
+
+	return false;
+}

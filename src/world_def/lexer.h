@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include "../types.h"
 #include "../string.h"
+#include "../errors.h"
 
 struct mgcd_lexer {
 	FILE *fp;
@@ -15,13 +16,16 @@ struct mgcd_lexer {
 	struct arena *mem;
 	struct atom_table *atom_table;
 	struct mgcd_context *ctx;
+
+	struct mgc_location tok_loc;
 };
 
 int
 mgcd_parse_open_file(
 		struct mgcd_lexer *lex,
 		struct mgcd_context *ctx,
-		char *file);
+		char *file,
+		file_id_t);
 
 struct mgcd_token
 mgcd_read_token(struct mgcd_lexer *ctx);

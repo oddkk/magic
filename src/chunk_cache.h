@@ -3,6 +3,8 @@
 
 #include "types.h"
 #include "mesh.h"
+#include "arena.h"
+#include "chunk.h"
 
 struct mgc_chunk;
 struct mgc_world;
@@ -25,6 +27,12 @@ struct mgc_chunk_cache_entry {
 
 struct chunk_gen_mesh_buffer;
 
+struct mgc_chunk_pool_entry {
+	size_t id;
+	struct mgc_chunk_pool_entry *next;
+	struct mgc_chunk chunk;
+};
+
 struct mgc_chunk_cache {
 	// TODO: Spatial data structure
 	struct mgc_chunk_cache_entry *entries;
@@ -34,11 +42,18 @@ struct mgc_chunk_cache {
 	struct chunk_gen_mesh_buffer *gen_mesh_buffer;
 	struct mgc_material_table *mat_table;
 
+	struct paged_list chunk_pool;
+	struct mgc_chunk_pool_entry *chunk_pool_free_list;
+
 	struct mgc_world *world;
 };
 
 void
-mgc_chunk_cache_init(struct mgc_chunk_cache *, struct mgc_world *, struct mgc_material_table *);
+mgc_chunk_cache_init(
+		struct mgc_chunk_cache *cache,
+		struct mgc_memory *memory,
+		struct mgc_world *world,
+		struct mgc_material_table *mat_table);
 
 void
 mgc_chunk_cache_request(struct mgc_chunk_cache *, v3i coord);

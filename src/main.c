@@ -10,6 +10,7 @@
 #include "intdef.h"
 
 #include "world.h"
+#include "registry.h"
 
 #include "world_def/world_def.h"
 #include "world_def/shape.h"
@@ -32,7 +33,8 @@ signalHandler(int sig)
 	}
 }
 
-static void glfwErrorCallback(int error, const char *msg) {
+static void
+glfw_error_callback(int error, const char *msg) {
 	fprintf(stderr, "glfw %i: %s\n", error, msg);
 }
 
@@ -84,67 +86,24 @@ int main(int argc, char *argv[])
 	struct chunk_gen_mesh_buffer *mesh_gen_mem;
 	mesh_gen_mem = arena_alloc(&arena, sizeof(struct chunk_gen_mesh_buffer));
 
+	struct mgc_registry reg = {0};
+	mgc_material_table_init(&reg.materials);
+
 	struct mgc_world_init_context world_init_context = {0};
 	world_init_context.atom_table = &atom_table;
 	world_init_context.memory = &memory;
 	world_init_context.world_arena = &arena;
 	world_init_context.transient_arena = &transient;
+	world_init_context.registry = &reg;
 	world_init_context.err = &err_ctx;
 
 	struct mgc_world world = {0};
 	mgc_world_init_world_def(&world, &world_init_context);
 
+	struct mgc_chunk_cache chunk_cache = {0};
+	mgc_chunk_cache_init(&chunk_cache, &memory, &world, &reg.materials);
 
-	/*
-	struct mgcd_context world_decl_ctx = {0};
-	mgcd_context_init(
-			&world_decl_ctx,
-			&atom_table,
-			&memory,
-			&arena,
-			&transient,
-			&err_ctx);
-
-	mgcd_resource_id test_shape_id;
-	test_shape_id = mgcd_request_resource_str(
-			&world_decl_ctx, MGCD_RESOURCE_NONE, STR("/world/test"));
-
-	err = mgcd_jobs_dispatch(&world_decl_ctx);
-	print_errors(&err_ctx);
-
-	if (err) {
-		return -1;
-	}
-	assert(err_ctx.num_errors == 0);
-
-	struct mgc_shape *test_shape;
-	test_shape = mgcd_expect_shape(&world_decl_ctx, test_shape_id);
-
-	struct mgc_chunk_mask chunk_mask = {0};
-	mgc_shape_fill_chunk(
-		&chunk_mask,
-		(struct mgc_world_transform){0},
-		test_shape
-	);
-
-	for (size_t i = 0; i < CHUNK_WIDTH*CHUNK_WIDTH*CHUNK_HEIGHT; i++) {
-		bool is_set = mgc_chunk_mask_geti(&chunk_mask, i);
-		chunk.tiles[i].material = is_set ? (i % 2 == 0 ? MAT_WOOD : MAT_WATER) : MAT_AIR;
-	}
-
-	struct mgc_mesh chunkMesh = chunk_gen_mesh(mesh_gen_mem, &mat_table, &chunk);
-
-	// struct mgc_chunk chunk = {0};
-
-	// for (size_t i = 0; i < CHUNK_WIDTH*CHUNK_WIDTH*CHUNK_HEIGHT; i++) {
-	// 	mgc_material_id mat = ((i / (CHUNK_WIDTH*CHUNK_WIDTH)) % 2) ? MAT_WOOD : MAT_WATER;
-	// 	chunk.tiles[i].material = (tick & (1 << (i % 64))) ? mat : MAT_AIR;
-	// }
-
-	// struct mgc_mesh chunkMesh = chunk_gen_mesh(&mat_table, &chunk);
-	*/
-
-	glfwSetErrorCallback(glfwErrorCallback);
+	glfwSetErrorCallback(glfw_error_callback);
 
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
@@ -154,6 +113,7 @@ int main(int argc, char *argv[])
 	WindowContext winCtx = {0};
 	winCtx.render.screenSize.x = 800;
 	winCtx.render.screenSize.y = 800;
+	winCtx.render.materials = &reg.materials;
 
 	GLFWwindow *win;
 	win = glfwCreateWindow(
@@ -177,10 +137,6 @@ int main(int argc, char *argv[])
 	if (err) {
 		return -1;
 	}
-
-	struct mgc_material_table mat_table = {0};
-	initMaterialTable(&mat_table);
-	winCtx.render.materials = &mat_table;
 
 	Camera cam = {0};
 
@@ -217,14 +173,17 @@ int main(int argc, char *argv[])
 
 	int tick = 0;
 
-	struct mgc_chunk_cache chunk_cache = {0};
-	mgc_chunk_cache_init(&chunk_cache, &world, &mat_table);
-
-	mgc_chunk_cache_request(&chunk_cache, V3i(0, 0, 0));
-	mgc_chunk_cache_request(&chunk_cache, V3i(0, 1, 0));
-	mgc_chunk_cache_request(&chunk_cache, V3i(0, -1, 0));
-	mgc_chunk_cache_request(&chunk_cache, V3i(1, 0, 0));
+	mgc_chunk_cache_request(&chunk_cache, V3i( 0, 0, 0));
+	mgc_chunk_cache_request(&chunk_cache, V3i( 0, 1, 0));
+	mgc_chunk_cache_request(&chunk_cache, V3i( 0,-1, 0));
+	mgc_chunk_cache_request(&chunk_cache, V3i( 1, 0, 0));
 	mgc_chunk_cache_request(&chunk_cache, V3i(-1, 0, 0));
+
+	mgc_chunk_cache_request(&chunk_cache, V3i( 0, 0,-1));
+	mgc_chunk_cache_request(&chunk_cache, V3i( 0, 1,-1));
+	mgc_chunk_cache_request(&chunk_cache, V3i( 0,-1,-1));
+	mgc_chunk_cache_request(&chunk_cache, V3i( 1, 0,-1));
+	mgc_chunk_cache_request(&chunk_cache, V3i(-1, 0,-1));
 
 	struct mgc_chunk_render_entry *render_queue;
 	size_t render_queue_cap = 1024;
@@ -295,8 +254,8 @@ int main(int argc, char *argv[])
 			struct mgc_chunk_render_entry *entry = &render_queue[queue_i];
 			v3i chunk_coord = entry->coord;
 			chunk_coord.x *= CHUNK_WIDTH;
-			chunk_coord.y *= CHUNK_HEIGHT;
-			chunk_coord.z *= CHUNK_WIDTH;
+			chunk_coord.y *= CHUNK_WIDTH;
+			chunk_coord.z *= CHUNK_HEIGHT;
 			v3 chunk_location = mgc_grid_draw_coord(chunk_coord);
 
 			glBindVertexArray(entry->mesh.vao);

@@ -8,6 +8,25 @@
 #include <string.h>
 #include <math.h>
 
+struct mgc_location
+mgc_loc_combine(struct mgc_location from, struct mgc_location to)
+{
+	struct mgc_location result = {0};
+	result.byte_from = from.byte_from;
+	result.byte_to   =   to.byte_to;
+
+	result.line_from = from.line_from;
+	result.line_to   =   to.line_to;
+
+	result.col_from  = from.col_from;
+	result.col_to    =   to.col_to;
+
+	assert(from.file_id == to.file_id);
+	result.file_id = from.file_id;
+
+	return result;
+}
+
 file_id_t
 mgc_err_add_file(struct mgc_error_context *err, struct string file_name)
 {
@@ -28,6 +47,14 @@ mgc_err_add_file(struct mgc_error_context *err, struct string file_name)
 	err->file_names[file_id - 1] = file_name;
 
 	return file_id;
+}
+
+struct mgc_location
+mgc_loc_file(file_id_t fid)
+{
+	struct mgc_location loc = {0};
+	loc.file_id = fid;
+	return loc;
 }
 
 static const char *
@@ -143,16 +170,31 @@ print_errors(struct mgc_error_context *err)
 		if (msg->loc.file_id - 1 < err->num_files && msg->loc.file_id > 0) {
 			file_name = err->file_names[msg->loc.file_id - 1];
 
-			char file_name_cstr[file_name.length + 1];
-			memcpy(file_name_cstr, file_name.text, file_name.length);
-			file_name_cstr[file_name.length] = 0;
+			// Print nothing if the error region has no extent.
+			if (msg->loc.byte_to > 0 && msg->loc.byte_from < (msg->loc.byte_to-1)) {
+				char file_name_cstr[file_name.length + 1];
+				memcpy(file_name_cstr, file_name.text, file_name.length);
+				file_name_cstr[file_name.length] = 0;
 
-			fp = fopen((const char *)file_name_cstr, "rb");
-			if (!fp) {
-				file_error = true;
+				fp = fopen((const char *)file_name_cstr, "rb");
+				if (!fp) {
+					file_error = true;
+				}
 			}
 		}
 
+#if 0
+		fprintf(out,
+			"byte: %zu-%zu\n"
+			"line: %u-%u\n"
+			"col:  %u-%u\n"
+			"fid:  %u\n",
+			msg->loc.byte_from, msg->loc.byte_to,
+			msg->loc.line_from, msg->loc.line_to,
+			msg->loc.col_from, msg->loc.col_to,
+			msg->loc.file_id
+		);
+#endif
 		fprintf(out, "%s%.*s\n",
 			level_prefix(msg->level),
 			LIT(file_name)

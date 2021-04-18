@@ -24,11 +24,15 @@ mgc_chunk_mask_geti(struct mgc_chunk_mask *mask, size_t i)
 void
 mgc_chunk_mask_set_to(struct mgc_chunk_mask *chunk, v3i c, bool is_set)
 {
-	assert(c.x >= 0 && c.x < CHUNK_WIDTH &&
-	       c.y >= 0 && c.y < CHUNK_WIDTH &&
-		   c.z >= 0 && c.z < CHUNK_HEIGHT);
-	size_t i = c.z*CHUNK_WIDTH*CHUNK_WIDTH + c.y*CHUNK_WIDTH + c.x;
-	mgc_chunk_mask_seti_to(chunk, i, is_set);
+	// assert(c.x >= 0 && c.x < CHUNK_WIDTH &&
+	//        c.y >= 0 && c.y < CHUNK_WIDTH &&
+	// 	   c.z >= 0 && c.z < CHUNK_HEIGHT);
+	if (c.x >= 0 && c.x < CHUNK_WIDTH &&
+			c.y >= 0 && c.y < CHUNK_WIDTH &&
+			c.z >= 0 && c.z < CHUNK_HEIGHT) {
+		size_t i = c.z*CHUNK_WIDTH*CHUNK_WIDTH + c.y*CHUNK_WIDTH + c.x;
+		mgc_chunk_mask_seti_to(chunk, i, is_set);
+	}
 }
 
 void

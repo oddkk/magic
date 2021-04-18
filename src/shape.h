@@ -18,6 +18,9 @@ mgc_world_transform_translate(struct mgc_world_transform *, v3i);
 void
 mgc_world_transform_xy_rotate(struct mgc_world_transform *, int);
 
+void
+mgc_world_transform_multiply(struct mgc_world_transform *, struct mgc_world_transform);
+
 // transforms axial coordinate according to world transform.
 static inline v3i
 mgc_world_transform(struct mgc_world_transform trans, v3i p)

@@ -17,7 +17,13 @@ struct mgc_location {
 	file_id_t file_id;
 };
 
+struct mgc_location
+mgc_loc_combine(struct mgc_location from, struct mgc_location to);
+
 #define MGC_NO_LOC ((struct mgc_location){.file_id=MGC_FILE_UNKNOWN})
+
+struct mgc_location
+mgc_loc_file(file_id_t fid);
 
 static inline bool
 mgc_loc_defined(struct mgc_location loc)

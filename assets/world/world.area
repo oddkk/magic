@@ -1,4 +1,5 @@
 #version 0.1
 
-add /mat/wood /world/test (0,0,0) 5;
+add /mat/wood  /world/test (0,0,0) 0;
+add /mat/water /world/test (0,0,-5) 0;
 

@@ -1,10 +1,13 @@
 #include "world_def.h"
 #include "vars.h"
 #include "shape.h"
+#include "area.h"
+#include "material.h"
 #include "jobs.h"
 #include "lexer.h"
 #include "parser.h"
 #include "../utils.h"
+#include "../registry.h"
 
 #include <string.h>
 #include <errno.h>
@@ -28,6 +31,12 @@ mgcd_res_type_name(enum mgcd_entry_type type)
 
 		case MGCD_ENTRY_SHAPE:
 			return "shape";
+
+		case MGCD_ENTRY_AREA:
+			return "area";
+
+		case MGCD_ENTRY_MATERIAL:
+			return "material";
 	}
 }
 
@@ -95,11 +104,13 @@ mgcd_context_init(struct mgcd_context *ctx,
 		struct mgc_memory *memory,
 		struct arena *mem,
 		struct arena *tmp_mem,
+		struct mgc_registry *registry,
 		struct mgc_error_context *err)
 {
 	ctx->atom_table = atom_table;
 	ctx->mem = mem;
 	ctx->tmp_mem = tmp_mem;
+	ctx->registry = registry;
 	ctx->err = err;
 
 	int e;
@@ -119,9 +130,6 @@ mgcd_context_init(struct mgcd_context *ctx,
 			sizeof(struct mgcd_resource));
 	paged_list_init(&ctx->resource_dependencies, memory,
 			sizeof(struct mgcd_resource_dependency));
-
-	paged_list_init(&ctx->shape_ops, memory,
-			sizeof(struct mgcd_shape_op));
 
 	ctx->root_scope = mgcd_alloc_resource(ctx);
 	struct mgcd_resource *root_resource;
@@ -218,6 +226,8 @@ mgcd_file_get_or_create(struct mgcd_context *ctx,
 
 		file->file_name = file_name;
 
+		file->error_fid = mgc_err_add_file(ctx->err, file_name->name);
+
 		file->parsed = mgcd_job_file_parse(ctx, fid);
 		file->finalized = mgcd_job_nopf(
 				ctx, &file->finalized,
@@ -267,13 +277,18 @@ mgcd_entry_type_from_ext(struct mgcd_context *ctx, struct atom *ext)
 		return MGCD_ENTRY_SCOPE;
 	} else if (ext == ctx->atoms.shp) {
 		return MGCD_ENTRY_SHAPE;
+	} else if (ext == ctx->atoms.area) {
+		return MGCD_ENTRY_AREA;
+	} else if (ext == ctx->atoms.mat) {
+		return MGCD_ENTRY_MATERIAL;
 	} else {
 		return MGCD_ENTRY_UNKNOWN;
 	}
 }
 
 mgcd_resource_id
-mgcd_request_resource(struct mgcd_context *ctx, mgcd_resource_id origin_scope, struct mgcd_path path)
+mgcd_request_resource(struct mgcd_context *ctx, mgcd_job_id req_job, struct mgc_location req_loc,
+		mgcd_resource_id origin_scope, struct mgcd_path path)
 {
 	int err;
 
@@ -369,7 +384,9 @@ mgcd_request_resource(struct mgcd_context *ctx, mgcd_resource_id origin_scope, s
 						struct string ext_str = {0};
 						mgcd_extract_extension(name_str,
 								&name_str, &ext_str);
-						ext = atom_create(ctx->atom_table, ext_str);
+						if (ext_str.length > 0) {
+							ext = atom_create(ctx->atom_table, ext_str);
+						}
 					}
 
 					name = atom_create(ctx->atom_table, name_str);
@@ -506,9 +523,15 @@ mgcd_request_resource(struct mgcd_context *ctx, mgcd_resource_id origin_scope, s
 	fts_close(ftsp);
 
 	if (file_res == MGCD_RESOURCE_NONE) {
+		struct arena *tmp_str_mem = ctx->tmp_mem;
+		arena_mark cp = arena_checkpoint(tmp_str_mem);
+		struct string path_str;
+		path_str = mgcd_path_to_string(tmp_str_mem, &path);
 		// TODO: Print resource path.
-		mgc_error(ctx->err, MGC_NO_LOC,
-				"Could not find a file for the resource ''");
+		mgc_error(ctx->err, req_loc,
+				"Could not find a file for the resource '%.*s'.",
+				LIT(path_str));
+		arena_reset(tmp_str_mem, cp);
 		return MGCD_RESOURCE_NONE;
 	}
 
@@ -561,11 +584,18 @@ mgcd_request_resource(struct mgcd_context *ctx, mgcd_resource_id origin_scope, s
 	res = mgcd_resource_get(ctx, result_res);
 	res->requested = true;
 
+	if (req_job >= 0) {
+		mgcd_job_dependency(ctx,
+				res->finalized,
+				req_job);
+	}
+
 	return result_res;
 }
 
 mgcd_resource_id
-mgcd_request_resource_str(struct mgcd_context *ctx, mgcd_resource_id root_scope, struct string str)
+mgcd_request_resource_str(struct mgcd_context *ctx, mgcd_job_id req_job, struct mgc_location req_loc,
+		mgcd_resource_id root_scope, struct string str)
 {
 	arena_mark cp = arena_checkpoint(ctx->tmp_mem);
 
@@ -576,7 +606,7 @@ mgcd_request_resource_str(struct mgcd_context *ctx, mgcd_resource_id root_scope,
 	}
 
 	mgcd_resource_id result;
-	result = mgcd_request_resource(ctx, root_scope, path);
+	result = mgcd_request_resource(ctx, req_job, req_loc, root_scope, path);
 
 	arena_reset(ctx->tmp_mem, cp);
 
@@ -642,7 +672,7 @@ mgcd_job_dispatch_file_parse(
 	path[file->file_name->name.length] = '\0';
 
 	struct mgcd_lexer lexer = {0};
-	err = mgcd_parse_open_file(&lexer, ctx, path);
+	err = mgcd_parse_open_file(&lexer, ctx, path, file->error_fid);
 	arena_reset(ctx->tmp_mem, cp);
 	if (err) {
 		return -1;
@@ -650,17 +680,19 @@ mgcd_job_dispatch_file_parse(
 
 	struct mgcd_parser parser = {0};
 	mgcd_parse_init(&parser, ctx, &lexer);
+	parser.finalize_job = resource->finalized;
 
-	struct mgcd_version version;
-	if (!mgcd_try_eat_version(&parser, &version)) {
-		mgc_warning(ctx->err, MGC_NO_LOC,
+	struct mgcd_version version = {0};
+	struct mgc_location version_loc = {0};
+	if (!mgcd_try_eat_version(&parser, &version, &version_loc)) {
+		mgc_warning(ctx->err, version_loc,
 				"Missing version number. Assuming newest version.\n");
 	}
 
 	int parse_err = 0;
 	switch (file->disposition) {
 		case MGCD_ENTRY_UNKNOWN:
-			mgc_error(ctx->err, MGC_NO_LOC,
+			mgc_error(ctx->err, mgc_loc_file(file->error_fid),
 					"Unknown file type.");
 			break;
 
@@ -681,6 +713,42 @@ mgcd_job_dispatch_file_parse(
 				}
 
 				resource->shape.def = shape;
+			}
+			break;
+
+		case MGCD_ENTRY_AREA:
+			{
+				struct mgcd_area *area;
+				area = arena_alloc(ctx->mem, sizeof(struct mgcd_area));
+
+				if (!mgcd_parse_area_block(
+							&parser, area, &area->ops)) {
+					parse_err = -1;
+					break;
+				}
+
+				resource->area.def = area;
+			}
+			break;
+
+		case MGCD_ENTRY_MATERIAL:
+			{
+				struct mgcd_material *material;
+				material = arena_alloc(ctx->mem, sizeof(struct mgcd_material));
+
+				if (!mgcd_parse_material_block(&parser, material)) {
+					parse_err = -1;
+					break;
+				}
+
+				if (!material->name) {
+					mgc_error(ctx->err, mgc_loc_file(file->error_fid),
+							"Material is missing name.");
+					parse_err = -1;
+					break;
+				}
+
+				resource->material.def = material;
 			}
 			break;
 	}
@@ -776,6 +844,32 @@ mgcd_job_dispatch_res_finalize(
 			mgcd_complete_shape(ctx, res->shape.def, mem, res->shape.ready);
 			break;
 
+		case MGCD_ENTRY_AREA:
+			res->shape.ready = arena_alloc(mem, sizeof(struct mgc_area));
+			mgcd_complete_area(ctx, res->area.def, mem, res->area.ready);
+			break;
+
+		case MGCD_ENTRY_MATERIAL:
+			{
+				bool found = false;
+				struct string target_name = res->material.def->name->name;
+				for (size_t i = 0; i < ctx->registry->materials.num_materials; i++) {
+					struct mgc_material *mat = &ctx->registry->materials.materials[i];
+					if (string_equal(mat->name, target_name)) {
+						res->material.real_id = i;
+						found = true;
+						break;
+					}
+				}
+				if (!found) {
+					mgc_error(ctx->err, res->material.def->name_loc,
+							"No material named '%.*s'.\n",
+							LIT(target_name));
+					return -1;
+				}
+			}
+			break;
+
 	}
 
 	return 0;
@@ -806,4 +900,15 @@ mgcd_expect_shape(struct mgcd_context *ctx, mgcd_resource_id id)
 	assert(res->shape.ready);
 
 	return res->shape.ready;
+}
+
+mgc_material_id
+mgcd_expect_material(struct mgcd_context *ctx, mgcd_resource_id id)
+{
+	struct mgcd_resource *res;
+	res = mgcd_resource_get_expecting(ctx, id, MGCD_ENTRY_MATERIAL);
+
+	assert(res->material.real_id > 0);
+
+	return res->material.real_id;
 }

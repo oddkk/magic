@@ -88,15 +88,18 @@ typedef struct {
 } MaterialTransition;
 
 
-typedef struct mgc_material_table {
+struct mgc_material_table {
 	struct mgc_material *materials;
-	size_t numMaterials;
-} MaterialTable;
+	size_t num_materials;
+};
 
 void
-initMaterialTable(MaterialTable *);
+mgc_material_table_init(struct mgc_material_table *);
 
 Material *
-getMaterial(MaterialTable *, mgc_material_id);
+mgc_mat_get(struct mgc_material_table *, mgc_material_id);
+
+bool
+mgc_material_lookup(struct mgc_material_table *, struct string, mgc_material_id *out_id);
 
 #endif

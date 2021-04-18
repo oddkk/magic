@@ -44,7 +44,7 @@ struct render_context {
 
 	v2i screenSize;
 
-	MaterialTable *materials;
+	struct mgc_material_table *materials;
 };
 
 int
@@ -90,6 +90,6 @@ struct chunk_gen_mesh_buffer {
 
 
 struct mgc_mesh
-chunk_gen_mesh(struct chunk_gen_mesh_buffer *buffer, MaterialTable *materials, struct mgc_chunk *cnk);
+chunk_gen_mesh(struct chunk_gen_mesh_buffer *buffer, struct mgc_material_table *materials, struct mgc_chunk *cnk);
 
 #endif

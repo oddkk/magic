@@ -16,6 +16,7 @@ typedef int mgcd_shape_id;
 
 #define MGCD_RESOURCE_NONE ((mgcd_resource_id)-1)
 #define MGCD_FILE_NONE ((mgcd_file_id)-1)
+#define MGCD_JOB_NONE ((mgcd_job_id)-1)
 
 struct mgcd_version {
 	int major, minor;
@@ -35,7 +36,10 @@ struct mgcd_version {
 	ATOM(radius) \
 	ATOM(height) \
 	ATOM(shp) \
+	ATOM(area) \
+	ATOM(mat) \
 	ATOM(mgc) \
+	ATOM(matref) \
 
 struct mgcd_atoms {
 #define ATOM(name) struct atom *name;
@@ -47,6 +51,8 @@ enum mgcd_entry_type {
 	MGCD_ENTRY_UNKNOWN = 0,
 	MGCD_ENTRY_SCOPE,
 	MGCD_ENTRY_SHAPE,
+	MGCD_ENTRY_AREA,
+	MGCD_ENTRY_MATERIAL,
 };
 
 enum mgcd_resource_state {
@@ -59,6 +65,11 @@ enum mgcd_resource_state {
 struct mgcd_shape;
 struct mgc_shape;
 
+struct mgcd_area;
+struct mgc_area;
+
+typedef uint16_t mgc_material_id;
+
 // TODO: Handle other file types like images and audio?
 struct mgcd_resource {
 	mgcd_resource_id id;
@@ -70,6 +81,8 @@ struct mgcd_resource {
 	bool failed;
 
 	mgcd_job_id names_resolved;
+	// Replace finalization with validation and let compilation of objects
+	// be performed or requested directly by the requesting site.
 	mgcd_job_id finalized;
 
 	enum mgcd_entry_type type;
@@ -83,6 +96,16 @@ struct mgcd_resource {
 			struct mgcd_shape *def;
 			struct mgc_shape *ready;
 		} shape;
+
+		struct {
+			struct mgcd_area *def;
+			struct mgc_area *ready;
+		} area;
+
+		struct {
+			struct mgcd_material *def;
+			mgc_material_id real_id;
+		} material;
 	};
 
 	mgcd_resource_id next, parent;
@@ -101,6 +124,8 @@ struct mgcd_file {
 
 	mgcd_job_id parsed;
 	mgcd_job_id finalized;
+
+	file_id_t error_fid;
 };
 
 struct mgcd_context {
@@ -115,11 +140,11 @@ struct mgcd_context {
 	mgcd_job_id terminal_jobs;
 	size_t unvisited_job_deps;
 
+	struct mgc_registry *registry;
+
 	struct paged_list files;
 	struct paged_list resources;
 	struct paged_list resource_dependencies;
-
-	struct paged_list shape_ops;
 
 	mgcd_resource_id root_scope;
 
@@ -137,13 +162,16 @@ mgcd_context_init(struct mgcd_context *,
 		struct mgc_memory *memory,
 		struct arena *mem,
 		struct arena *tmp_mem,
+		struct mgc_registry *registry,
 		struct mgc_error_context *err);
 
 mgcd_resource_id
-mgcd_request_resource(struct mgcd_context *, mgcd_resource_id root_scope, struct mgcd_path);
+mgcd_request_resource(struct mgcd_context *, mgcd_job_id req_job, struct mgc_location,
+		mgcd_resource_id root_scope, struct mgcd_path);
 
 mgcd_resource_id
-mgcd_request_resource_str(struct mgcd_context *, mgcd_resource_id root_scope, struct string);
+mgcd_request_resource_str(struct mgcd_context *, mgcd_job_id req_job, struct mgc_location,
+		mgcd_resource_id root_scope, struct string);
 
 struct mgcd_resource *
 mgcd_resource_get(struct mgcd_context *, mgcd_resource_id);
@@ -156,5 +184,8 @@ mgcd_file_find(struct mgcd_context *, struct atom *file_name);
 
 struct mgc_shape *
 mgcd_expect_shape(struct mgcd_context *, mgcd_resource_id);
+
+mgc_material_id
+mgcd_expect_material(struct mgcd_context *, mgcd_resource_id);
 
 #endif

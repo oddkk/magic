@@ -42,7 +42,7 @@ struct mgcd_shape_op {
 		} hexagon;
 
 		struct {
-			struct string file;
+			MGCD_TYPE(mgcd_resource_id) file;
 			MGCD_TYPE(v3i) coord;
 		} heightmap;
 

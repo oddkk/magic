@@ -207,7 +207,7 @@ mgcd_path_make_abs(struct mgcd_context *ctx,
 	arena_mark cp = arena_checkpoint(mem);
 
 	struct mgcd_path_tmp_segment *root = NULL;
-	struct mgcd_path_tmp_segment **head_ptr = NULL;
+	struct mgcd_path_tmp_segment **head_ptr = &root;
 	size_t num_segments = 0;
 
 	// Build path to the root scope.
@@ -272,4 +272,38 @@ mgcd_path_print(struct mgcd_path *path)
 	for (size_t i = 0; i < path->num_segments; i++) {
 		printf("/%.*s", ALIT(path->segments[i]));
 	}
+}
+
+struct string
+mgcd_path_to_string(struct arena *mem, struct mgcd_path *path)
+{
+	size_t len = 0;
+	if (path->origin == MGCD_PATH_REL) {
+		len += 1;
+	}
+
+	for (size_t i = 0; i < path->num_segments; i++) {
+		len += 1 + path->segments[i]->name.length;
+	}
+
+	struct string result = {0};
+	result.length = len;
+	result.text = arena_alloc(mem, len + 1);
+
+	char *it = result.text;
+	if (path->origin == MGCD_PATH_REL) {
+		*it = '.';
+		it += 1;
+	}
+
+	for (size_t i = 0; i < path->num_segments; i++) {
+		*it = '/';
+		it += 1;
+		memcpy(it,
+				path->segments[i]->name.text,
+				path->segments[i]->name.length);
+		it += path->segments[i]->name.length;
+	}
+
+	return result;
 }

@@ -12,6 +12,7 @@ mgcd_parse_init(struct mgcd_parser *parser,
 {
 	parser->ctx = ctx;
 	parser->lex = lex;
+	parser->finalize_job = MGCD_JOB_NONE;
 }
 
 struct mgcd_token
@@ -61,12 +62,15 @@ mgcd_try_get_ident(struct mgcd_token tok, struct atom **out_atom)
 }
 
 bool
-mgcd_try_eat_ident(struct mgcd_parser *parser, struct atom **out_atom)
+mgcd_try_eat_ident(struct mgcd_parser *parser, struct atom **out_atom, struct mgc_location *out_loc)
 {
 	struct mgcd_token tok;
 	tok = mgcd_peek_token(parser);
 	if (mgcd_try_get_ident(tok, out_atom)) {
 		mgcd_eat_token(parser);
+		if (out_loc) {
+			*out_loc = tok.loc;
+		}
 		return true;
 	}
 
@@ -87,54 +91,123 @@ mgcd_try_get_version(struct mgcd_token tok, struct mgcd_version *out_version)
 }
 
 bool
-mgcd_try_eat_version(struct mgcd_parser *parser, struct mgcd_version *out_version)
+mgcd_try_eat_version(struct mgcd_parser *parser,
+		struct mgcd_version *out_version,
+		struct mgc_location *out_loc)
 {
 	struct mgcd_token tok;
 	tok = mgcd_peek_token(parser);
 	if (mgcd_try_get_version(tok, out_version)) {
 		mgcd_eat_token(parser);
+		if (out_loc) {
+			*out_loc = tok.loc;
+		}
 		return true;
 	}
 
 	return false;
 }
 
-bool
-mgcd_try_get_path(struct mgcd_token tok, struct string *out_path)
-{
-	if (tok.type != MGCD_TOK_FILE_PATH) {
-		return false;
-	}
-
-	if (out_path) {
-		*out_path = tok.file_path;
-	}
-
-	return true;
-}
+struct mgcd_tmp_path_segment {
+	struct atom *ident;
+	struct mgcd_tmp_path_segment *next;
+};
 
 bool
-mgcd_expect_var_path(struct mgcd_parser *parser, struct string *out_path)
+mgcd_expect_path(struct mgcd_parser *parser, struct mgc_location *out_loc, struct mgcd_path *out_path)
 {
 	struct mgcd_token tok;
 	tok = mgcd_peek_token(parser);
-	if (mgcd_try_get_path(tok, out_path)) {
+
+	struct mgc_location loc = tok.loc;
+
+	bool path_relative = tok.path_seg.flags & MGCD_PATH_SEG_REL;
+
+	size_t num_segments = 0;
+	struct mgcd_tmp_path_segment *head = NULL, **end = &head;
+	struct arena *mem = parser->ctx->tmp_mem;
+	arena_mark cp = arena_checkpoint(mem);
+
+	while ((tok.type == MGCD_TOK_PATH_SEG ||
+				tok.type == MGCD_TOK_PATH_OPEN_EXPR)) {
 		mgcd_eat_token(parser);
-		return true;
+
+		if (tok.type == MGCD_TOK_PATH_OPEN_EXPR) {
+			panic("TODO: Path expressions");
+			arena_reset(mem, cp);
+			return false;
+		}
+
+		if (tok.path_seg.ident) {
+			struct mgcd_tmp_path_segment *seg;
+			seg = arena_alloc(mem, sizeof(struct mgcd_tmp_path_segment));
+			seg->ident = tok.path_seg.ident;
+			*end = seg;
+			end = &seg->next;
+			num_segments += 1;
+		}
+		
+		if (tok.path_seg.flags & MGCD_PATH_SEG_END) {
+			break;
+		}
+
+		tok = mgcd_peek_token(parser);
 	}
 
-	return false;
+	if (tok.type != MGCD_TOK_PATH_SEG &&
+			tok.type != MGCD_TOK_CLOSE_BLOCK) {
+		struct string token_name;
+		token_name = mgcd_token_type_name(tok.type);
+		mgc_error(parser->ctx->err, tok.loc,
+				"Expected path, got %.*s.",
+				LIT(token_name));
+		arena_reset(mem, cp);
+		return false;
+	}
+
+	struct mgcd_path result = {0};
+
+	result.origin = path_relative ? MGCD_PATH_REL : MGCD_PATH_ABS;
+	result.num_segments = num_segments;
+	result.segments = arena_allocn(
+		parser->ctx->mem,
+		result.num_segments,
+		sizeof(struct atom *)
+	);
+
+	size_t seg_i = 0;
+	struct mgcd_tmp_path_segment *it = head;
+	while (it) {
+		assert(seg_i < result.num_segments);
+		result.segments[seg_i] = it->ident;
+
+		it = it->next;
+		seg_i += 1;
+	}
+	assert(seg_i == result.num_segments);
+
+	*out_path = result;
+
+	loc = mgc_loc_combine(loc, tok.loc);
+
+	if (out_loc) {
+		*out_loc = loc;
+	}
+
+	arena_reset(mem, cp);
+	return true;
 }
 
 bool
 mgcd_expect_var_resource(struct mgcd_parser *parser, MGCD_TYPE(mgcd_resource_id) *out)
 {
-	struct mgcd_token tok;
-	tok = mgcd_peek_token(parser);
-	struct string path = {0};
-	if (mgcd_try_get_path(tok, &path)) {
+	struct mgcd_path path = {0};
+	struct mgc_location loc = {0};
+	if (mgcd_expect_path(parser, &loc, &path)) {
 		mgcd_resource_id result;
-		result = mgcd_request_resource_str(parser->ctx, parser->root_scope, path);
+		result = mgcd_request_resource(
+				parser->ctx, parser->finalize_job,
+				loc, parser->root_scope, path);
 
 		if (result >= 0) {
 			*out = mgcd_var_lit_mgcd_resource_id(result);
@@ -177,7 +250,21 @@ mgcd_expect_tok(struct mgcd_parser *parser, enum mgcd_token_type type)
 		mgcd_eat_token(parser);
 		return true;
 	}
+
 	return false;
+}
+
+void
+mgcd_report_unexpect_tok(struct mgcd_parser *parser, enum mgcd_token_type type)
+{
+	struct mgcd_token tok;
+	tok = mgcd_peek_token(parser);
+
+	struct string expected_token_name, token_name;
+	expected_token_name = mgcd_token_type_name(type);
+	token_name = mgcd_token_type_name(tok.type);
+	mgc_error(parser->ctx->err, tok.loc,
+			"Expected '%.*s', got '%.*s'.", LIT(expected_token_name), LIT(token_name));
 }
 
 #if 0
@@ -242,6 +329,7 @@ mgcd_expect_var_v3i(struct mgcd_parser *parser, MGCD_TYPE(v3i) *out)
 				}
 
 				if (!mgcd_expect_tok(parser, MGCD_TOK_CLOSE_TUPLE)) {
+					mgcd_report_unexpect_tok(parser, MGCD_TOK_CLOSE_TUPLE);
 					return false;
 				}
 

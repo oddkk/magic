@@ -7,19 +7,16 @@
 
 typedef int mgcd_resource_id;
 struct mgcd_context;
-
-struct mgc_terrain_shape {
-	struct mgc_shape shape;
-	mgc_material_id mat_id;
-
-	mgcd_resource_id resource_id;
-};
+struct mgc_registry;
 
 struct mgc_world_src_world_def {
-	struct mgc_terrain_shape *terrain_shapes;
-	size_t num_terrain_shapes;
-
 	struct mgcd_context *ctx;
+	struct mgc_registry *registry;
+
+	mgcd_resource_id terrain_id;
+	struct mgc_area *terrain;
+
+	bool files_dirty;
 };
 
 struct mgc_world_init_context;

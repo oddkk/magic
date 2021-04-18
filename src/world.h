@@ -24,6 +24,7 @@ struct mgc_world {
 struct atom_table;
 struct mgc_memory;
 struct mgc_error_context;
+struct mgc_material_table;
 struct arena;
 
 struct mgc_world_init_context {
@@ -31,6 +32,7 @@ struct mgc_world_init_context {
 	struct mgc_memory *memory;
 	struct arena *world_arena;
 	struct arena *transient_arena;
+	struct mgc_registry *registry;
 	struct mgc_error_context *err;
 };
 

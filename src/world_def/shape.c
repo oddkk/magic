@@ -59,13 +59,8 @@ mgcd_shape_op_print(struct mgcd_shape_op *op)
 static struct mgcd_shape_op *
 mgcd_alloc_shape_op(struct mgcd_parser *parser, struct mgcd_shape_op op)
 {
-	struct paged_list *shape_ops = &parser->ctx->shape_ops;
-
-	size_t new_op_id;
-	new_op_id = paged_list_push(shape_ops);
-
 	struct mgcd_shape_op *new_op;
-	new_op = paged_list_get(shape_ops, new_op_id);
+	new_op = arena_alloc(parser->ctx->mem, sizeof(struct mgcd_shape_op));
 
 	*new_op = op;
 
@@ -76,7 +71,9 @@ struct mgcd_shape_op *
 mgcd_parse_shape_op(struct mgcd_parser *parser)
 {
 	struct atom *shape_kind;
-	if (!mgcd_try_eat_ident(parser, &shape_kind)) {
+	struct mgc_location op_loc = {0};
+	if (!mgcd_try_eat_ident(parser, &shape_kind, &op_loc)) {
+		mgcd_report_unexpect_tok(parser, MGCD_TOK_IDENT);
 		return NULL;
 	}
 
@@ -100,7 +97,7 @@ mgcd_parse_shape_op(struct mgcd_parser *parser)
 	} else if (shape_kind == atoms->heightmap) {
 		op.op = MGCD_SHAPE_HEIGHTMAP;
 
-		if (!mgcd_expect_var_path(parser, &op.heightmap.file)) {
+		if (!mgcd_expect_var_resource(parser, &op.heightmap.file)) {
 			return NULL;
 		}
 
@@ -130,6 +127,7 @@ mgcd_parse_shape_op(struct mgcd_parser *parser)
 		}
 
 		if (!mgcd_expect_tok(parser, MGCD_TOK_ARG_SEP)) {
+			mgcd_report_unexpect_tok(parser, MGCD_TOK_ARG_SEP);
 			return NULL;
 		}
 
@@ -171,8 +169,7 @@ mgcd_parse_shape_block(
 		ops_ptr = &stmt->next;
 
 		if (!mgcd_expect_tok(parser, MGCD_TOK_END_STMT)) {
-			mgc_error(parser->ctx->err, MGC_NO_LOC,
-					"Expected ';'.");
+			mgcd_report_unexpect_tok(parser, MGCD_TOK_END_STMT);
 			mgcd_stmt_error_recover(parser);
 			continue;
 		}
@@ -193,8 +190,9 @@ mgcd_parse_shape_file(
 	struct mgcd_parser parser = {0};
 	mgcd_parse_init(&parser, parse_ctx, lexer);
 
-	if (!mgcd_try_eat_version(&parser, &file->version)) {
-		mgc_warning(parse_ctx->err, MGC_NO_LOC,
+	struct mgc_location version_loc = {0};
+	if (!mgcd_try_eat_version(&parser, &file->version, &version_loc)) {
+		mgc_warning(parse_ctx->err, version_loc,
 				"Missing version number. Assuming newest version.\n");
 	}
 

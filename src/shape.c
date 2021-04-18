@@ -31,6 +31,15 @@ mgc_world_transform_xy_rotate(struct mgc_world_transform *trans, int r)
 	trans->xy_rotation = (((trans->xy_rotation + r) % 6) + 6) % 6;
 }
 
+void
+mgc_world_transform_multiply(
+		struct mgc_world_transform *local_trans,
+		struct mgc_world_transform world_trans)
+{
+	mgc_world_transform_xy_rotate(local_trans, world_trans.xy_rotation);
+	mgc_world_transform_translate(local_trans, world_trans.translation);
+}
+
 #define MGC_SHAPE_MAX_NUM_CHILDREN 2
 
 size_t

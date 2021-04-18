@@ -28,9 +28,11 @@ mgc_grid_draw_coord(v3i p)
 {
 	v3 res;
 
-	res.x = p.x * hexStrideX + p.z * hexStaggerX;
-	res.y = p.y * hexH;
-	res.z = p.z * hexStrideY;
+	// NOTE: World coordinates have z as up, while render coordinates have y as
+	// up.
+	res.x = p.x * hexStrideX + p.y * hexStaggerX;
+	res.y = p.z * hexH;
+	res.z = p.y * hexStrideY;
 
 	return res;
 }

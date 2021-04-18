@@ -3,13 +3,14 @@
 
 #include "world_def.h"
 #include "vars.h"
+#include "../errors.h"
 
 #define MGCD_TOKEN_TYPES \
+	TOKEN(ERROR) \
 	TOKEN(EOF) \
 	TOKEN(VERSION) \
 	TOKEN(IDENT) \
 	TOKEN(INTEGER_LIT) \
-	TOKEN(FILE_PATH) \
 	TOKEN(STRING_LIT) \
 	TOKEN(OPEN_BLOCK) \
 	TOKEN(CLOSE_BLOCK) \
@@ -17,6 +18,10 @@
 	TOKEN(CLOSE_TUPLE) \
 	TOKEN(ARG_SEP) \
 	TOKEN(ASSIGN) \
+	TOKEN(ACCESS) \
+	TOKEN(PATH_SEG) \
+	TOKEN(PATH_OPEN_EXPR) \
+	TOKEN(PATH_CLOSE_EXPR) \
 	TOKEN(END_STMT)
 
 enum mgcd_token_type {
@@ -30,8 +35,16 @@ MGCD_TOKEN_TYPES
 struct string
 mgcd_token_type_name(enum mgcd_token_type);
 
+enum mgcd_path_seg_flags {
+	// If set, the segment is relative to the current directory
+	// (eg. starts with './').
+	MGCD_PATH_SEG_REL = (1<<0),
+	MGCD_PATH_SEG_END = (1<<1),
+};
+
 struct mgcd_token {
 	enum mgcd_token_type type;
+	struct mgc_location loc;
 
 	union {
 		struct atom *ident;
@@ -39,6 +52,10 @@ struct mgcd_token {
 		struct string string_lit;
 		struct string file_path;
 		struct mgcd_version version;
+		struct {
+			struct atom *ident;
+			enum mgcd_path_seg_flags flags;
+		} path_seg;
 	};
 };
 
@@ -55,6 +72,7 @@ struct mgcd_parser {
 	int peek_buffer_count;
 
 	mgcd_resource_id root_scope;
+	mgcd_job_id finalize_job;
 };
 
 void
@@ -72,19 +90,24 @@ bool
 mgcd_try_get_ident(struct mgcd_token tok, struct atom **out_atom);
 
 bool
-mgcd_try_eat_ident(struct mgcd_parser *parser, struct atom **out_atom);
+mgcd_try_eat_ident(struct mgcd_parser *parser,
+		struct atom **out_atom,
+		struct mgc_location *out_loc);
 
 bool
 mgcd_try_get_version(struct mgcd_token tok, struct mgcd_version *out_version);
 
 bool
-mgcd_try_eat_version(struct mgcd_parser *parser, struct mgcd_version *out_version);
+mgcd_try_eat_version(struct mgcd_parser *parser,
+		struct mgcd_version *out_version,
+		struct mgc_location *out_loc);
 
 bool
 mgcd_try_get_path(struct mgcd_token tok, struct string *out_path);
 
 bool
-mgcd_expect_var_path(struct mgcd_parser *parser, struct string *out_path);
+mgcd_expect_path(struct mgcd_parser *parser,
+		struct mgc_location *out_loc, struct mgcd_path *out_path);
 
 bool
 mgcd_expect_var_resource(struct mgcd_parser *parser, MGCD_TYPE(mgcd_resource_id) *out);
@@ -94,6 +117,9 @@ mgcd_expect_var_int(struct mgcd_parser *parser, MGCD_TYPE(int) *out);
 
 bool
 mgcd_expect_tok(struct mgcd_parser *parser, enum mgcd_token_type type);
+
+void
+mgcd_report_unexpect_tok(struct mgcd_parser *parser, enum mgcd_token_type type);
 
 bool
 mgcd_expect_int(struct mgcd_parser *parser, int *out);

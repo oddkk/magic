@@ -40,6 +40,9 @@ struct mgc_chunk {
 size_t
 chunkCoordToIndex(v3i coord);
 
+v3i
+mgc_chunk_coord_to_world(v3i);
+
 Tile *
 chunkTile(struct mgc_chunk *, v3i localCoord);
 

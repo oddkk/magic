@@ -28,7 +28,7 @@ mgccc_debug_trace(v3i coord, const char *fmt, ...)
 #endif
 
 void
-mgc_chunk_cache_init(struct mgc_chunk_cache *cache, struct mgc_world *world, struct mgc_material_table *mat_table)
+mgc_chunk_cache_init(struct mgc_chunk_cache *cache, struct mgc_memory *memory, struct mgc_world *world, struct mgc_material_table *mat_table)
 {
 	memset(cache, 0, sizeof(struct mgc_chunk_cache));
 	cache->world = world;
@@ -36,6 +36,30 @@ mgc_chunk_cache_init(struct mgc_chunk_cache *cache, struct mgc_world *world, str
 	cache->cap_entries = MGC_CHUNK_CACHE_SIZE;
 	cache->entries = calloc(cache->cap_entries, sizeof(struct mgc_chunk_cache_entry));
 	cache->gen_mesh_buffer = calloc(1, sizeof(struct chunk_gen_mesh_buffer));
+
+	paged_list_init(
+		&cache->chunk_pool,
+		memory,
+		sizeof(struct mgc_chunk_pool_entry)
+	);
+}
+
+static struct mgc_chunk *
+mgc_chunk_cache_alloc_chunk(struct mgc_chunk_cache *cache)
+{
+	struct mgc_chunk_pool_entry *entry;
+	entry = cache->chunk_pool_free_list;
+	if (entry) {
+		cache->chunk_pool_free_list = entry->next;
+		entry->next = NULL;
+		return &entry->chunk;
+	}
+
+	size_t id = paged_list_push(&cache->chunk_pool);
+	entry = paged_list_get(&cache->chunk_pool, id);
+	entry->id = id;
+
+	return &entry->chunk;
 }
 
 static ssize_t
@@ -98,6 +122,8 @@ mgc_chunk_cache_invalidate(struct mgc_chunk_cache *cache, v3i coord)
 void
 mgc_chunk_cache_tick(struct mgc_chunk_cache *cache)
 {
+	mgc_world_tick(cache->world);
+
 	for (size_t entry_i = 0; entry_i < cache->head; entry_i++) {
 		struct mgc_chunk_cache_entry *entry = &cache->entries[entry_i];
 
@@ -109,6 +135,8 @@ mgc_chunk_cache_tick(struct mgc_chunk_cache *cache)
 
 			case MGC_CHUNK_CACHE_UNLOADED:
 				mgccc_debug_trace(entry->coord, "Loading...");
+				assert(entry->chunk == NULL);
+				entry->chunk = mgc_chunk_cache_alloc_chunk(cache);
 				err = mgc_world_load_chunk(cache->world, entry->chunk, entry->coord);
 				if (err < 0) {
 					entry->state = MGC_CHUNK_CACHE_FAILED;

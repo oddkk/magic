@@ -33,11 +33,11 @@ mgc_world_tick(struct mgc_world *world)
 	switch (world->src) {
 		case MGC_WORLD_SRC_WORLD_DEF:
 			mgc_world_src_world_def_tick(&world->world_def);
-			break;
+			return;
 
 		case MGC_WORLD_SRC_PRECOMPUTED:
 			mgc_world_src_precomputed_tick(&world->precomputed);
-			break;
+			return;
 	}
 
 	panic("Invalid world source.");
