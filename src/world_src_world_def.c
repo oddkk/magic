@@ -42,7 +42,12 @@ mgc_world_src_world_def_load_chunk(
 		v3i coord)
 {
 	chunk->location = coord;
+	if (!world->terrain) {
+		return -1;
+	}
+
 	mgc_area_apply(world->terrain, chunk);
+
 	return 0;
 }
 

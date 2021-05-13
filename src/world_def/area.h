@@ -6,12 +6,14 @@
 
 enum mgcd_area_op_kind {
 	MGCD_AREA_ADD,
+	MGCD_AREA_AREA,
 	MGCD_AREA_REMOVE,
 };
 
 struct mgcd_area_op {
 	struct mgcd_area_op *next;
 	enum mgcd_area_op_kind op;
+	struct mgc_location loc;
 
 	union {
 		struct {
@@ -20,6 +22,12 @@ struct mgcd_area_op {
 			MGCD_TYPE(v3i) translation;
 			MGCD_TYPE(int) rotation;
 		} add;
+
+		struct {
+			MGCD_TYPE(mgcd_resource_id) area;
+			MGCD_TYPE(v3i) translation;
+			MGCD_TYPE(int) rotation;
+		} area;
 
 		struct {
 			MGCD_TYPE(mgcd_resource_id) shape;

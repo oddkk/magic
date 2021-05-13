@@ -19,25 +19,48 @@
 #include <stdlib.h>
 #include <fts.h>
 
+struct string
+mgcd_entry_type_name(enum mgcd_entry_type type)
+{
+	switch (type) {
+		case MGCD_ENTRY_SCOPE:
+			return STR("scope");
+
+		case MGCD_ENTRY_SHAPE:
+			return STR("shape");
+
+		case MGCD_ENTRY_AREA:
+			return STR("area");
+
+		case MGCD_ENTRY_MATERIAL:
+			return STR("material");
+
+		case MGCD_ENTRY_UNKNOWN:
+		default:
+			return STR("unknown");
+	}
+}
+
 const char *
 mgcd_res_type_name(enum mgcd_entry_type type)
 {
-	switch (type) {
-		case MGCD_ENTRY_UNKNOWN:
-			return "unknown";
+	return mgcd_entry_type_name(type).text;
+}
 
-		case MGCD_ENTRY_SCOPE:
-			return "scope";
-
-		case MGCD_ENTRY_SHAPE:
-			return "shape";
-
-		case MGCD_ENTRY_AREA:
-			return "area";
-
-		case MGCD_ENTRY_MATERIAL:
-			return "material";
+enum mgcd_entry_type
+mgcd_entry_type_from_name(struct mgcd_context *ctx, struct atom *name)
+{
+	struct mgcd_atoms *atoms = &ctx->atoms;
+	enum mgcd_entry_type type = MGCD_ENTRY_UNKNOWN;
+	if (name == atoms->shape) {
+		type = MGCD_ENTRY_SHAPE;
+	} else if (name == atoms->area) {
+		type = MGCD_ENTRY_AREA;
+	} else if (name == atoms->mat) {
+		type = MGCD_ENTRY_MATERIAL;
 	}
+
+	return type;
 }
 
 static mgcd_resource_id
@@ -442,7 +465,7 @@ mgcd_request_resource(struct mgcd_context *ctx, mgcd_job_id req_job, struct mgc_
 							new_res = mgcd_resource_get(ctx, new_id);
 
 							if (f->fts_info == FTS_F) {
-								new_res->type = mgcd_entry_type_from_ext(ctx, ext);
+								enum mgcd_entry_type type = mgcd_entry_type_from_ext(ctx, ext);
 
 								char real_path_buffer[PATH_MAX+1];
 								if (!realpath(f->fts_path, real_path_buffer)) {
@@ -476,17 +499,20 @@ mgcd_request_resource(struct mgcd_context *ctx, mgcd_job_id req_job, struct mgc_
 
 								struct mgcd_file *file;
 								file = mgcd_file_get(ctx, fid);
-								file->disposition = new_res->type;
+								file->disposition = type;
 								file->resource = new_id;
+								mgcd_init_job_resolve(ctx, type, new_id);
 
+								/*
 								new_res->names_resolved = mgcd_job_res_names(ctx, new_id);
 								new_res->finalized = mgcd_job_res_finalize(ctx, new_id);
 								mgcd_job_dependency(ctx,
-										file->finalized,
-										new_res->names_resolved);
-								mgcd_job_dependency(ctx,
 										new_res->names_resolved,
 										new_res->finalized);
+								*/
+								mgcd_job_dependency(ctx,
+										file->finalized,
+										new_res->names_resolved);
 							} else {
 								new_res->type = MGCD_ENTRY_SCOPE;
 								new_res->scope.children = MGCD_RESOURCE_NONE;
@@ -613,6 +639,38 @@ mgcd_request_resource_str(struct mgcd_context *ctx, mgcd_job_id req_job, struct 
 	return result;
 }
 
+void
+mgcd_init_job_resolve(struct mgcd_context *ctx, enum mgcd_entry_type type, mgcd_resource_id res_id)
+{
+	struct mgcd_resource *res;
+	res = mgcd_resource_get(ctx, res_id);
+
+	res->type = type;
+	res->names_resolved = mgcd_job_res_names(ctx, res_id);
+	res->finalized = mgcd_job_res_finalize(ctx, res_id);
+	mgcd_job_dependency(ctx,
+			res->names_resolved,
+			res->finalized);
+}
+
+mgcd_resource_id
+mgcd_alloc_anonymous_resource(
+		struct mgcd_context *ctx,
+		enum mgcd_entry_type type,
+		struct mgc_location loc)
+{
+	mgcd_resource_id new_id;
+	new_id = mgcd_alloc_resource(ctx);
+	mgcd_init_job_resolve(ctx, type, new_id);
+
+	struct mgcd_resource *res;
+	res = mgcd_resource_get(ctx, new_id);
+
+	res->loc = loc;
+
+	return new_id;
+}
+
 struct mgcd_resource *
 mgcd_resource_get(struct mgcd_context *ctx, mgcd_resource_id id)
 {
@@ -690,67 +748,8 @@ mgcd_job_dispatch_file_parse(
 	}
 
 	int parse_err = 0;
-	switch (file->disposition) {
-		case MGCD_ENTRY_UNKNOWN:
-			mgc_error(ctx->err, mgc_loc_file(file->error_fid),
-					"Unknown file type.");
-			break;
-
-		case MGCD_ENTRY_SCOPE:
-			{
-			}
-			break;
-
-		case MGCD_ENTRY_SHAPE:
-			{
-				struct mgcd_shape *shape;
-				shape = arena_alloc(ctx->mem, sizeof(struct mgcd_shape));
-
-				if (!mgcd_parse_shape_block(
-						&parser, shape, &shape->ops)) {
-					parse_err = -1;
-					break;
-				}
-
-				resource->shape.def = shape;
-			}
-			break;
-
-		case MGCD_ENTRY_AREA:
-			{
-				struct mgcd_area *area;
-				area = arena_alloc(ctx->mem, sizeof(struct mgcd_area));
-
-				if (!mgcd_parse_area_block(
-							&parser, area, &area->ops)) {
-					parse_err = -1;
-					break;
-				}
-
-				resource->area.def = area;
-			}
-			break;
-
-		case MGCD_ENTRY_MATERIAL:
-			{
-				struct mgcd_material *material;
-				material = arena_alloc(ctx->mem, sizeof(struct mgcd_material));
-
-				if (!mgcd_parse_material_block(&parser, material)) {
-					parse_err = -1;
-					break;
-				}
-
-				if (!material->name) {
-					mgc_error(ctx->err, mgc_loc_file(file->error_fid),
-							"Material is missing name.");
-					parse_err = -1;
-					break;
-				}
-
-				resource->material.def = material;
-			}
-			break;
+	if (!mgcd_parse_resource_block(&parser, file->disposition, file->resource)) {
+		parse_err = -1;
 	}
 
 	if (!mgcd_expect_tok(&parser, MGCD_TOK_EOF)) {

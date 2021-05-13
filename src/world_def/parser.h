@@ -110,7 +110,10 @@ mgcd_expect_path(struct mgcd_parser *parser,
 		struct mgc_location *out_loc, struct mgcd_path *out_path);
 
 bool
-mgcd_expect_var_resource(struct mgcd_parser *parser, MGCD_TYPE(mgcd_resource_id) *out);
+mgcd_expect_var_resource(
+		struct mgcd_parser *parser,
+		enum mgcd_entry_type disposition,
+		MGCD_TYPE(mgcd_resource_id) *out);
 
 bool
 mgcd_expect_var_int(struct mgcd_parser *parser, MGCD_TYPE(int) *out);
@@ -131,6 +134,21 @@ bool
 mgcd_stmt_error_recover(struct mgcd_parser *parser);
 
 bool
+mgcd_block_error_recover(struct mgcd_parser *parser);
+
+bool
 mgcd_block_continue(struct mgcd_token tok);
+
+bool
+mgcd_parse_bracketed_resource_block(struct mgcd_parser *parser, enum mgcd_entry_type type, mgcd_resource_id *out_id);
+
+bool
+mgcd_parse_anonymous_resource_block(struct mgcd_parser *parser, enum mgcd_entry_type type, mgcd_resource_id *out_id);
+
+bool
+mgcd_parse_resource_block(
+		struct mgcd_parser *parser,
+		enum mgcd_entry_type disposition,
+		mgcd_resource_id);
 
 #endif

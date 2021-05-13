@@ -97,7 +97,7 @@ mgcd_parse_shape_op(struct mgcd_parser *parser)
 	} else if (shape_kind == atoms->heightmap) {
 		op.op = MGCD_SHAPE_HEIGHTMAP;
 
-		if (!mgcd_expect_var_resource(parser, &op.heightmap.file)) {
+		if (!mgcd_expect_var_resource(parser, MGCD_ENTRY_UNKNOWN, &op.heightmap.file)) {
 			return NULL;
 		}
 

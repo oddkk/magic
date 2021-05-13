@@ -15,6 +15,7 @@ mgcd_alloc_area_op(struct mgcd_parser *parser, struct mgcd_area_op op)
 
 	return new_op;
 }
+
 struct mgcd_area_op *
 mgcd_parse_area_op(struct mgcd_parser *parser)
 {
@@ -32,11 +33,11 @@ mgcd_parse_area_op(struct mgcd_parser *parser)
 	if (op_kind == atoms->add) {
 		op.op = MGCD_AREA_ADD;
 
-		if (!mgcd_expect_var_resource(parser, &op.add.material)) {
+		if (!mgcd_expect_var_resource(parser, MGCD_ENTRY_MATERIAL, &op.add.material)) {
 			return NULL;
 		}
 
-		if (!mgcd_expect_var_resource(parser, &op.add.shape)) {
+		if (!mgcd_expect_var_resource(parser, MGCD_ENTRY_SHAPE, &op.add.shape)) {
 			return NULL;
 		}
 
@@ -48,10 +49,25 @@ mgcd_parse_area_op(struct mgcd_parser *parser)
 			op.add.rotation = mgcd_var_lit_int(0);
 		}
 
+	} else if (op_kind == atoms->area) {
+		op.op = MGCD_AREA_AREA;
+
+		if (!mgcd_expect_var_resource(parser, MGCD_ENTRY_AREA, &op.area.area)) {
+			return NULL;
+		}
+
+		if (!mgcd_expect_var_v3i(parser, &op.add.translation)) {
+			op.area.translation = mgcd_var_lit_v3i(V3i(0, 0, 0));
+		}
+
+		if (!mgcd_expect_var_int(parser, &op.add.rotation)) {
+			op.area.rotation = mgcd_var_lit_int(0);
+		}
+
 	} else if (op_kind == atoms->remove) {
 		op.op = MGCD_AREA_REMOVE;
 
-		if (!mgcd_expect_var_resource(parser, &op.remove.shape)) {
+		if (!mgcd_expect_var_resource(parser, MGCD_ENTRY_AREA, &op.remove.shape)) {
 			return NULL;
 		}
 
@@ -187,6 +203,12 @@ mgcd_complete_area_internal(
 					mgcd_tmp_area_append_op(ctx, result, res);
 				}
 				break;
+
+			case MGCD_AREA_AREA:
+				{
+					mgc_error(ctx->err, op->loc,
+							"TODO: Implement sub-areas.");
+				}
 
 			case MGCD_AREA_REMOVE:
 				{

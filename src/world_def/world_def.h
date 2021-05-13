@@ -109,6 +109,7 @@ struct mgcd_resource {
 	};
 
 	mgcd_resource_id next, parent;
+	struct mgc_location loc;
 };
 
 struct mgcd_resource_dependency {
@@ -173,6 +174,12 @@ mgcd_resource_id
 mgcd_request_resource_str(struct mgcd_context *, mgcd_job_id req_job, struct mgc_location,
 		mgcd_resource_id root_scope, struct string);
 
+mgcd_resource_id
+mgcd_alloc_anonymous_resource(struct mgcd_context *, enum mgcd_entry_type, struct mgc_location);
+
+void
+mgcd_init_job_resolve(struct mgcd_context *, enum mgcd_entry_type, mgcd_resource_id);
+
 struct mgcd_resource *
 mgcd_resource_get(struct mgcd_context *, mgcd_resource_id);
 
@@ -187,5 +194,11 @@ mgcd_expect_shape(struct mgcd_context *, mgcd_resource_id);
 
 mgc_material_id
 mgcd_expect_material(struct mgcd_context *, mgcd_resource_id);
+
+enum mgcd_entry_type
+mgcd_entry_type_from_name(struct mgcd_context *ctx, struct atom *name);
+
+struct string
+mgcd_entry_type_name(enum mgcd_entry_type type);
 
 #endif

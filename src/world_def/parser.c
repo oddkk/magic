@@ -5,6 +5,10 @@
 #include "../utils.h"
 #include "../config.h"
 
+#include "shape.h"
+#include "area.h"
+#include "material.h"
+
 void
 mgcd_parse_init(struct mgcd_parser *parser,
 		struct mgcd_context *ctx,
@@ -156,11 +160,11 @@ mgcd_expect_path(struct mgcd_parser *parser, struct mgc_location *out_loc, struc
 
 	if (tok.type != MGCD_TOK_PATH_SEG &&
 			tok.type != MGCD_TOK_CLOSE_BLOCK) {
-		struct string token_name;
-		token_name = mgcd_token_type_name(tok.type);
-		mgc_error(parser->ctx->err, tok.loc,
-				"Expected path, got %.*s.",
-				LIT(token_name));
+		// struct string token_name;
+		// token_name = mgcd_token_type_name(tok.type);
+		// mgc_error(parser->ctx->err, tok.loc,
+		// 		"Expected path, got %.*s.",
+		// 		LIT(token_name));
 		arena_reset(mem, cp);
 		return false;
 	}
@@ -199,10 +203,16 @@ mgcd_expect_path(struct mgcd_parser *parser, struct mgc_location *out_loc, struc
 }
 
 bool
-mgcd_expect_var_resource(struct mgcd_parser *parser, MGCD_TYPE(mgcd_resource_id) *out)
+mgcd_expect_var_resource(
+		struct mgcd_parser *parser,
+		enum mgcd_entry_type disposition,
+		MGCD_TYPE(mgcd_resource_id) *out)
 {
 	struct mgcd_path path = {0};
 	struct mgc_location loc = {0};
+	struct atom *ident = NULL;
+	struct mgc_location ident_loc = {0};
+
 	if (mgcd_expect_path(parser, &loc, &path)) {
 		mgcd_resource_id result;
 		result = mgcd_request_resource(
@@ -213,6 +223,44 @@ mgcd_expect_var_resource(struct mgcd_parser *parser, MGCD_TYPE(mgcd_resource_id)
 			*out = mgcd_var_lit_mgcd_resource_id(result);
 			return true;
 		}
+	} else if (mgcd_try_eat_ident(parser, &ident, &ident_loc)) {
+		enum mgcd_entry_type ident_disposition;
+		ident_disposition = mgcd_entry_type_from_name(parser->ctx, ident);
+
+		if (ident_disposition == MGCD_ENTRY_UNKNOWN) {
+			mgc_error(parser->ctx->err, ident_loc,
+					"Expected a resource path or a resource block.");
+			return false;
+		}
+
+		if (disposition != MGCD_ENTRY_UNKNOWN &&
+				ident_disposition != disposition) {
+			struct string expected, got;
+			expected = mgcd_entry_type_name(disposition);
+			got = mgcd_entry_type_name(disposition);
+			mgc_error(parser->ctx->err, ident_loc,
+					"Expected a %.*s, got %.*s.",
+					LIT(expected), LIT(got));
+			return false;
+		}
+	}
+
+	if (mgcd_expect_tok(parser, MGCD_TOK_OPEN_BLOCK)) {
+		if (disposition == MGCD_ENTRY_UNKNOWN) {
+			mgc_error(parser->ctx->err, ident_loc,
+					"Unable to determine the type of this inline resource. "
+					"Specify the intended resource type");
+			return false;
+		}
+		mgcd_resource_id res_id;
+		if (!mgcd_parse_bracketed_resource_block(parser, disposition, &res_id)) {
+			mgc_error(parser->ctx->err, ident_loc,
+					"Expected a path or resource block.");
+			return false;
+		}
+
+		*out = mgcd_var_lit_mgcd_resource_id(res_id);
+		return true;
 	}
 
 	return false;
@@ -358,6 +406,20 @@ mgcd_stmt_error_recover(struct mgcd_parser *parser)
 }
 
 bool
+mgcd_block_error_recover(struct mgcd_parser *parser)
+{
+	struct mgcd_token current_token;
+	current_token = mgcd_peek_token(parser);
+	while (current_token.type != MGCD_TOK_CLOSE_BLOCK &&
+			current_token.type != MGCD_TOK_EOF) {
+		mgcd_eat_token(parser);
+		current_token = mgcd_peek_token(parser);
+	}
+
+	return current_token.type != MGCD_TOK_EOF;
+}
+
+bool
 mgcd_block_continue(struct mgcd_token tok)
 {
 	switch (tok.type) {
@@ -368,4 +430,121 @@ mgcd_block_continue(struct mgcd_token tok)
 		default:
 			return true;
 	}
+}
+
+bool
+mgcd_parse_bracketed_resource_block(
+		struct mgcd_parser *parser,
+		enum mgcd_entry_type type,
+		mgcd_resource_id *out_id)
+{
+	// if (!mgcd_expect_tok(parser, MGCD_TOK_OPEN_BLOCK)) {
+	// 	mgcd_report_unexpect_tok(parser, MGCD_TOK_OPEN_BLOCK);
+	// 	return false;
+	// }
+
+	if (!mgcd_parse_anonymous_resource_block(parser, type, out_id)) {
+		mgcd_block_error_recover(parser);
+		return false;
+	}
+
+	if (!mgcd_expect_tok(parser, MGCD_TOK_CLOSE_BLOCK)) {
+		mgcd_report_unexpect_tok(parser, MGCD_TOK_CLOSE_BLOCK);
+		return false;
+	}
+
+	return true;
+}
+
+bool
+mgcd_parse_anonymous_resource_block(
+		struct mgcd_parser *parser,
+		enum mgcd_entry_type type,
+		mgcd_resource_id *out_id)
+{
+	mgcd_resource_id res_id;
+	res_id = mgcd_alloc_anonymous_resource(parser->ctx, type, MGC_NO_LOC);
+
+	if (mgcd_parse_resource_block(parser, type, res_id)) {
+		*out_id = res_id;
+		return true;
+	}
+
+	return false;
+}
+
+bool
+mgcd_parse_resource_block(
+		struct mgcd_parser *parser,
+		enum mgcd_entry_type disposition,
+		mgcd_resource_id res_id)
+{
+	struct mgcd_resource *resource;
+	resource = mgcd_resource_get(parser->ctx, res_id);
+
+	struct mgcd_context *ctx = parser->ctx;
+
+	switch (disposition) {
+		case MGCD_ENTRY_UNKNOWN:
+			mgc_error(ctx->err, MGC_NO_LOC, // mgc_loc_file(resource->error_fid),
+					"Unknown file type.");
+			return false;
+
+		case MGCD_ENTRY_SCOPE:
+			{
+			}
+			break;
+
+		case MGCD_ENTRY_SHAPE:
+			{
+				struct mgcd_shape *shape;
+				shape = arena_alloc(ctx->mem, sizeof(struct mgcd_shape));
+
+				if (!mgcd_parse_shape_block(
+						parser, shape, &shape->ops)) {
+					return false;
+				}
+
+				resource->shape.def = shape;
+
+				return true;
+			}
+
+		case MGCD_ENTRY_AREA:
+			{
+				struct mgcd_area *area;
+				area = arena_alloc(ctx->mem, sizeof(struct mgcd_area));
+
+				if (!mgcd_parse_area_block(
+							parser, area, &area->ops)) {
+					return false;
+				}
+
+				resource->area.def = area;
+
+				return true;
+			}
+
+		case MGCD_ENTRY_MATERIAL:
+			{
+				struct mgcd_material *material;
+				material = arena_alloc(ctx->mem, sizeof(struct mgcd_material));
+
+				if (!mgcd_parse_material_block(parser, material)) {
+					return false;
+				}
+
+				if (!material->name) {
+					mgc_error(ctx->err, MGC_NO_LOC, // mgc_loc_file(file->error_fid),
+							"Material is missing name.");
+					return false;
+				}
+
+				resource->material.def = material;
+
+				return true;
+			}
+	}
+
+	return false;
 }
