@@ -19,7 +19,7 @@ typedef enum {
 	TRAIT_CONDUCTIVE,
 } DeafultTraitTypes;
 
-typedef struct {
+typedef struct mgc_material_trait_type {
 	struct string name;
 } TraitType;
 
@@ -29,11 +29,11 @@ typedef enum {
 	STATUS_SHOCKED,
 } DeafultStatusTypes;
 
-typedef struct {
+typedef struct mgc_material_status_type {
 	struct string name;
 } StatusType;
 
-typedef struct {
+typedef struct mgc_material_status {
 	StatusId status;
 	int duration;
 } Status;
@@ -43,7 +43,7 @@ typedef enum {
 	ACTION_SHOCK,
 } DeafultActionTypes;
 
-typedef struct {
+typedef struct mgc_material_action_type {
 	struct string name;
 } ActionType;
 
@@ -62,7 +62,7 @@ typedef struct mgc_material {
 	bool solid;
 } Material;
 
-typedef struct {
+typedef struct mgc_material_trait {
 	mgc_material_id material;
 	TraitId trait;
 } MaterialTrait;
@@ -74,7 +74,7 @@ typedef enum {
 	TRANS_SET_MATERIAL,
 } TransitionType;
 
-typedef struct {
+typedef struct mgc_material_transition {
 	TraitId trait;
 	ActionId action;
 

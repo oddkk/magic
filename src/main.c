@@ -173,17 +173,14 @@ int main(int argc, char *argv[])
 
 	int tick = 0;
 
-	mgc_chunk_cache_request(&chunk_cache, V3i( 0, 0, 0));
-	mgc_chunk_cache_request(&chunk_cache, V3i( 0, 1, 0));
-	mgc_chunk_cache_request(&chunk_cache, V3i( 0,-1, 0));
-	mgc_chunk_cache_request(&chunk_cache, V3i( 1, 0, 0));
-	mgc_chunk_cache_request(&chunk_cache, V3i(-1, 0, 0));
-
-	mgc_chunk_cache_request(&chunk_cache, V3i( 0, 0,-1));
-	mgc_chunk_cache_request(&chunk_cache, V3i( 0, 1,-1));
-	mgc_chunk_cache_request(&chunk_cache, V3i( 0,-1,-1));
-	mgc_chunk_cache_request(&chunk_cache, V3i( 1, 0,-1));
-	mgc_chunk_cache_request(&chunk_cache, V3i(-1, 0,-1));
+	int w = 2;
+	for (int z = -w; z <= w; z++) {
+		for (int y = -w; y <= w; y++) {
+			for (int x = -w; x <= w; x++) {
+				mgc_chunk_cache_request(&chunk_cache, V3i(x, y, z));
+			}
+		}
+	}
 
 	struct mgc_chunk_render_entry *render_queue;
 	size_t render_queue_cap = 1024;
@@ -223,16 +220,16 @@ int main(int argc, char *argv[])
 		);
 
 		cam.location = v3_add(chunkCenter, V3(
-			0.0f, 8.0f, 10.0f
+			0.0f, 50.0f, 50.0f
 			// cos(((float)tick / 480.0f) * 2 * M_PI) * 10.0f,
 			// 8.0f,
 			// sin(((float)tick / 480.0f) * 2 * M_PI) * 10.0f
 		));
 
 		v3 lightPos = v3_add(chunkCenter, V3(
-			cos(((float)tick / 480.0f) * 2 * M_PI) * 10.0f,
+			cos(((float)tick / 480.0f) * 2 * M_PI) * 50.0f,
 			8.0f,
-			sin(((float)tick / 480.0f) * 2 * M_PI) * 10.0f
+			sin(((float)tick / 480.0f) * 2 * M_PI) * 50.0f
 		));
 
 		v3 lookAt = chunkCenter;

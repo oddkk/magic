@@ -1,14 +1,21 @@
 #version 0.1
 
 # add /mat/wood  /world/test (0,0,0) 0;
-add /mat/water /world/test (0,0,-10) 0;
+# add /mat/water /world/test (0,0,-10) 0;
+# 
+# add /mat/wood {
+# 	# cell (1, 0, 0);
+# 	# cell (1, 1, 0);
+# 	# cell (1, 1, 1);
+# 
+# 	hexagon (8, 8, 0) 3 5;
+# 	hexagon (8, 2, 0) 3 5;
+# };
+# 
+# add /mat/water { cell (13, 13, 0); };
+# add /mat/wood  { cell (13, 13, 1); };
+
 
 add /mat/wood {
-	# cell (1, 0, 0);
-	# cell (1, 1, 0);
-	# cell (1, 1, 1);
-
-	hexagon (8, 8, 0) 3 5;
-	hexagon (8, 2, 0) 3 5;
+	hexagon (0, 0, -50) 100 100;
 };
-
