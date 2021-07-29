@@ -3,12 +3,13 @@
 
 #include <math.h>
 #include "math.h"
+#include "config.h"
 
 // Height
-static const float hexH = 0.25;
+static const float hexH = HEX_HEIGHT;
 
 // Radius
-static const float hexR = 0.25;
+static const float hexR = HEX_RADIUS;
 extern float hexStrideX;
 extern float hexStrideY;
 extern float hexStaggerX;

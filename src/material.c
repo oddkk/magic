@@ -26,6 +26,7 @@ Material defaultMaterials[] = {
 	[MAT_WATER] = { STR("water"), COLOR_HEX(0x0000ff), true },
 	[MAT_WOOD]  = { STR("wood"),  COLOR_HEX(0x804000), true },
 	[MAT_METAL] = { STR("metal"), COLOR_HEX(0xd3d3d3), true },
+	[MAT_SAND]  = { STR("sand"),  COLOR_HEX(0xc2b280), true },
 };
 
 MaterialTrait defaultMaterialTraits[] = {
@@ -40,6 +41,8 @@ MaterialTrait defaultMaterialTraits[] = {
 	{ MAT_WOOD, TRAIT_FLAMABLE },
 
 	{ MAT_METAL, TRAIT_CONDUCTIVE },
+
+	{ MAT_SAND, TRAIT_SOAKABLE },
 };
 
 MaterialTransition defaultTraitTransitions[] = {

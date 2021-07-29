@@ -54,6 +54,7 @@ typedef enum {
 	MAT_WATER_VAPOUR,
 	MAT_WOOD,
 	MAT_METAL,
+	MAT_SAND,
 } DeafultMaterialTypes;
 
 typedef struct mgc_material {

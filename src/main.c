@@ -40,16 +40,74 @@ glfw_error_callback(int error, const char *msg) {
 
 typedef struct {
 	struct render_context render;
+
+	bool enable_mouse_input;
+	struct {
+		bool left;
+		bool right;
+		bool up;
+		bool down;
+		bool forward;
+		bool backward;
+	} keys;
 } WindowContext;
 
+struct mgc_camera {
+	v3 position;
+	float yaw, pitch;
+};
+
 void windowSizeCallback(GLFWwindow *win, int width, int height) {
-	WindowContext *winCtx =
+	WindowContext *win_ctx =
 		(WindowContext *)glfwGetWindowUserPointer(win);
 
-	winCtx->render.screenSize.x = width;
-	winCtx->render.screenSize.y = height;
+	win_ctx->render.screenSize.x = width;
+	win_ctx->render.screenSize.y = height;
 
 	glViewport(0, 0, width, height);
+}
+
+static void
+mouse_button_callback(GLFWwindow *win, int button, int action, int mods)
+{
+	WindowContext *win_ctx =
+		(WindowContext *)glfwGetWindowUserPointer(win);
+	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+		win_ctx->enable_mouse_input = true;
+	}
+}
+
+static void
+key_button_callback(GLFWwindow *win, int key, int scancode, int action, int mods)
+{
+	WindowContext *win_ctx =
+		(WindowContext *)glfwGetWindowUserPointer(win);
+	if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+		win_ctx->enable_mouse_input = false;
+	}
+
+#define KEYDEF(bind_name, key_id) \
+	if (key == key_id) { \
+		if (action == GLFW_PRESS)   win_ctx->keys.bind_name = true;  \
+		if (action == GLFW_RELEASE) win_ctx->keys.bind_name = false; \
+	}
+
+	KEYDEF(left, GLFW_KEY_A);
+	KEYDEF(right, GLFW_KEY_D);
+	KEYDEF(forward, GLFW_KEY_W);
+	KEYDEF(backward, GLFW_KEY_S);
+	KEYDEF(up, GLFW_KEY_E);
+	KEYDEF(down, GLFW_KEY_Q);
+
+#undef KEYDEF
+}
+
+static void
+cursor_enter_callback(GLFWwindow *win, int entered)
+{
+	WindowContext *win_ctx =
+		(WindowContext *)glfwGetWindowUserPointer(win);
+	memset(&win_ctx->keys, 0, sizeof(win_ctx->keys));
 }
 
 int main(int argc, char *argv[])
@@ -110,30 +168,34 @@ int main(int argc, char *argv[])
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	glfwWindowHint(GLFW_SAMPLES, 4);
 
-	WindowContext winCtx = {0};
-	winCtx.render.screenSize.x = 800;
-	winCtx.render.screenSize.y = 800;
-	winCtx.render.materials = &reg.materials;
+	WindowContext win_ctx = {0};
+	win_ctx.render.screenSize.x = 800;
+	win_ctx.render.screenSize.y = 800;
+	win_ctx.render.materials = &reg.materials;
 
 	GLFWwindow *win;
 	win = glfwCreateWindow(
-			winCtx.render.screenSize.x,
-			winCtx.render.screenSize.y,
+			win_ctx.render.screenSize.x,
+			win_ctx.render.screenSize.y,
 			"Magic", NULL, NULL);
 	if (!win) {
 		fprintf(stderr, "Could not create window.\n");
 		return -1;
 	}
 
-	glfwSetWindowUserPointer(win, &winCtx);
+	glfwSetWindowUserPointer(win, &win_ctx);
 
 	glfwSetWindowSizeCallback(win, windowSizeCallback);
+	glfwSetMouseButtonCallback(win, mouse_button_callback);
+	glfwSetKeyCallback(win, key_button_callback);
+	glfwSetCursorEnterCallback(win, cursor_enter_callback);
+
 	glfwMakeContextCurrent(win);
 	gladLoadGL();
 
 	printf("OpenGL %s\n", glGetString(GL_VERSION));
 
-	err = render_initialize(&winCtx.render);
+	err = render_initialize(&win_ctx.render);
 	if (err) {
 		return -1;
 	}
@@ -169,11 +231,9 @@ int main(int argc, char *argv[])
 
 	glEnable(GL_DEPTH_TEST);
 
-	signal(SIGINT, signalHandler);
-
 	int tick = 0;
 
-	int w = 1;
+	int w = 2;
 	for (int z = -w; z <= w; z++) {
 		for (int y = -w; y <= w; y++) {
 			for (int x = -w; x <= w; x++) {
@@ -187,8 +247,88 @@ int main(int argc, char *argv[])
 
 	render_queue = calloc(sizeof(struct mgc_chunk_render_entry), render_queue_cap);
 
+	bool mouse_control_enabled = false;
+
+	double last_cur_x = 0, last_cur_y = 0;
+	struct mgc_camera c = {0};
+	// c.position.x = 16.0f;
+	// c.position.y = 16.0f;
+	c.position.z = 16.0f;
+	c.pitch = -.25;
+	c.yaw = .75;
+
+	signal(SIGINT, signalHandler);
 	while (!glfwWindowShouldClose(win) && !shouldQuit) {
 		tick += 1;
+
+		if (!mouse_control_enabled && win_ctx.enable_mouse_input) {
+			glfwSetInputMode(win, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+			if (glfwRawMouseMotionSupported()) {
+				glfwSetInputMode(win, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+			}
+
+			mouse_control_enabled = true;
+			glfwGetCursorPos(win, &last_cur_x, &last_cur_y);
+		} else if (mouse_control_enabled && !win_ctx.enable_mouse_input) {
+			if (glfwRawMouseMotionSupported()) {
+				glfwSetInputMode(win, GLFW_RAW_MOUSE_MOTION, GLFW_FALSE);
+			}
+			glfwSetInputMode(win, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+
+			mouse_control_enabled = false;
+		}
+
+		if (mouse_control_enabled) {
+			double cur_x, cur_y;
+			glfwGetCursorPos(win, &cur_x, &cur_y);
+			v2 delta = V2(cur_x - last_cur_x, cur_y - last_cur_y);
+
+			last_cur_x = cur_x;
+			last_cur_y = cur_y;
+
+			c.yaw += (float)delta.x * 0.005f;
+			c.yaw -= floor(c.yaw);
+
+			c.pitch -= (float)delta.y * 0.005f;
+			if (c.pitch > 1.0f) {
+				c.pitch = 1.0f;
+			} else if (c.pitch < -1.0f) {
+				c.pitch = -1.0f;
+			}
+
+			v3 move_delta = {0};
+			v3 move_final = {0};
+
+			if (win_ctx.keys.left)     {move_delta.x -= 1.0f;}
+			if (win_ctx.keys.right)    {move_delta.x += 1.0f;}
+
+			if (win_ctx.keys.up)       {move_delta.y += 1.0f;}
+			if (win_ctx.keys.down)     {move_delta.y -= 1.0f;}
+
+			if (win_ctx.keys.forward)  {move_delta.z -= 1.0f;}
+			if (win_ctx.keys.backward) {move_delta.z += 1.0f;}
+
+			if (move_delta.x != 0.0f) {
+				move_final.x += cos(PI*2.0f*c.yaw)/move_delta.x;
+				move_final.z += sin(PI*2.0f*c.yaw)/move_delta.x;
+			}
+			if (move_delta.z != 0.0f) {
+				float pitch_comp = fabs(cos((PI/2.0f)*c.pitch));
+				move_final.x += pitch_comp*-sin(PI*2.0f*c.yaw)/move_delta.z;
+				move_final.z += pitch_comp*cos(PI*2.0f*c.yaw)/move_delta.z;
+				move_final.y += -sin((PI/2.0f)*c.pitch)/move_delta.z;
+			}
+
+			move_final.y += move_delta.y;
+
+			float accel = 0.5f;
+
+			move_final.x *= accel;
+			move_final.y *= accel;
+			move_final.z *= accel;
+
+			c.position = v3_add(c.position, move_final);
+		}
 
 		mgc_chunk_cache_tick(&chunk_cache);
 
@@ -219,23 +359,33 @@ int main(int argc, char *argv[])
 			8.0f * hexStrideY
 		);
 
-		cam.location = v3_add(chunkCenter, V3(
-			0.0f, 50.0f, 50.0f
-			// cos(((float)tick / 480.0f) * 2 * M_PI) * 10.0f,
-			// 8.0f,
-			// sin(((float)tick / 480.0f) * 2 * M_PI) * 10.0f
-		));
-
 		v3 lightPos = v3_add(chunkCenter, V3(
 			cos(((float)tick / 480.0f) * 2 * M_PI) * 50.0f,
 			8.0f,
 			sin(((float)tick / 480.0f) * 2 * M_PI) * 50.0f
 		));
 
-		v3 lookAt = chunkCenter;
-		v3 up = V3(0.0f, 1.0f, 0.0f);
-		m4 camera;
-		mat4_look_at(camera.m, cam.location.m, lookAt.m, up.m);
+		m4 camera, cam_tmp;
+
+		mat4_identity(camera.m);
+
+		v3 axis_x = V3(1.0f, 0.0f, 0.0f);
+		v3 axis_y = V3(0.0f, 1.0f, 0.0f);
+
+		mat4_identity(cam_tmp.m);
+		// mat4_rotation_x(cam_tmp.m, PI/2 * c.pitch);
+		mat4_rotation_axis(cam_tmp.m, axis_x.m, (PI/2.0f) * -c.pitch);
+		mat4_multiply(camera.m, camera.m, cam_tmp.m);
+
+		mat4_identity(cam_tmp.m);
+		// mat4_rotation_y(cam_tmp.m, PI*2 * c.yaw);
+		mat4_rotation_axis(cam_tmp.m, axis_y.m, PI*2.0f * c.yaw);
+		mat4_multiply(camera.m, camera.m, cam_tmp.m);
+
+		v3 cam_pos = V3(-c.position.x, -c.position.y, -c.position.z);
+		mat4_identity(cam_tmp.m);
+		mat4_translate(cam_tmp.m, cam_tmp.m, cam_pos.m);
+		mat4_multiply(camera.m, camera.m, cam_tmp.m);
 
 		m4 cameraTransform;
 		mat4_multiply(cameraTransform.m, perspective.m, camera.m);
