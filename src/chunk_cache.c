@@ -147,23 +147,27 @@ mgc_chunk_cache_tick(struct mgc_chunk_cache *cache)
 					mgccc_debug_trace(entry->coord, "Loading YIELD");
 					break;
 				}
-				// TODO: Load chunk from world def and saved delta.
 				entry->state = MGC_CHUNK_CACHE_LOADED;
 				mgccc_debug_trace(entry->coord, "Loading OK");
 				// fallthrough
 
 			case MGC_CHUNK_CACHE_LOADED:
 			case MGC_CHUNK_CACHE_DIRTY:
-				mgccc_debug_trace(entry->coord, "Meshing...");
-				// TODO: Mesh
-				entry->mesh = chunk_gen_mesh(
-					cache->gen_mesh_buffer,
-					cache->mat_table,
-					entry->chunk
-				);
-				entry->state = MGC_CHUNK_CACHE_MESHED;
-				mgccc_debug_trace(entry->coord, "Meshing OK");
-				// fallthrough
+				{
+					mgccc_debug_trace(entry->coord, "Meshing...");
+					struct mgc_chunk_gen_mesh_result res = {0};
+					res = chunk_gen_mesh(
+							cache->gen_mesh_buffer,
+							cache->mat_table,
+							entry->chunk
+							);
+					for (size_t i = 0; i < RENDER_CHUNKS_PER_CHUNK; i++) {
+						entry->mesh[i] = res.mesh[i];
+					}
+					entry->state = MGC_CHUNK_CACHE_MESHED;
+					mgccc_debug_trace(entry->coord, "Meshing OK");
+					// fallthrough
+				}
 
 			case MGC_CHUNK_CACHE_MESHED:
 			case MGC_CHUNK_CACHE_FAILED:
@@ -187,10 +191,29 @@ mgc_chunk_cache_make_render_queue(
 
 		if (entry->state == MGC_CHUNK_CACHE_MESHED ||
 			entry->state == MGC_CHUNK_CACHE_DIRTY) {
-			queue[*queue_head].mesh = entry->mesh;
-			queue[*queue_head].coord = entry->coord;
+			for (size_t rchunk_i = 0; rchunk_i < RENDER_CHUNKS_PER_CHUNK; rchunk_i++) {
+				if (entry->mesh[rchunk_i].numVertices > 0) {
+					v3i chunk_offset = V3i(
+						entry->coord.x * CHUNK_WIDTH,
+						entry->coord.y * CHUNK_WIDTH,
+						entry->coord.z * CHUNK_HEIGHT
+					);
+					v3i rchunk_offset = V3i(
+						(rchunk_i % RENDER_CHUNKS_PER_CHUNK_WIDTH) * RENDER_CHUNK_WIDTH,
+						((rchunk_i / RENDER_CHUNKS_PER_CHUNK_WIDTH) % RENDER_CHUNKS_PER_CHUNK_WIDTH) * RENDER_CHUNK_WIDTH,
+						(rchunk_i / RENDER_CHUNKS_PER_CHUNK_LAYER) * RENDER_CHUNK_HEIGHT
+					);
 
-			*queue_head += 1;
+					assert(*queue_head < queue_cap);
+					struct mgc_chunk_render_entry *render_entry;
+					render_entry = &queue[*queue_head];
+
+					render_entry->mesh = entry->mesh[rchunk_i];
+					render_entry->coord = v3i_add(chunk_offset, rchunk_offset);
+
+					*queue_head += 1;
+				}
+			}
 		}
 	}
 }

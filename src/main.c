@@ -173,7 +173,7 @@ int main(int argc, char *argv[])
 
 	int tick = 0;
 
-	int w = 2;
+	int w = 1;
 	for (int z = -w; z <= w; z++) {
 		for (int y = -w; y <= w; y++) {
 			for (int x = -w; x <= w; x++) {
@@ -249,11 +249,7 @@ int main(int argc, char *argv[])
 
 		for (size_t queue_i = 0; queue_i < render_queue_length; queue_i++) {
 			struct mgc_chunk_render_entry *entry = &render_queue[queue_i];
-			v3i chunk_coord = entry->coord;
-			chunk_coord.x *= CHUNK_WIDTH;
-			chunk_coord.y *= CHUNK_WIDTH;
-			chunk_coord.z *= CHUNK_HEIGHT;
-			v3 chunk_location = mgc_grid_draw_coord(chunk_coord);
+			v3 chunk_location = mgc_grid_draw_coord(entry->coord);
 
 			glBindVertexArray(entry->mesh.vao);
 

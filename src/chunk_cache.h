@@ -18,11 +18,14 @@ enum mgc_chunk_cache_entry_state {
 	MGC_CHUNK_CACHE_FAILED,
 };
 
+#define MGC_DIRTY_MASK_BIT_PER_UNIT (sizeof(u64)*8)
+
 struct mgc_chunk_cache_entry {
 	enum mgc_chunk_cache_entry_state state;
 	v3i coord;
 	struct mgc_chunk *chunk;
-	struct mgc_mesh mesh;
+	struct mgc_mesh mesh[RENDER_CHUNKS_PER_CHUNK];
+	// u64 dirty_mask[(RENDER_CHUNKS_PER_CHUNK+MGC_DIRTY_MASK_BIT_PER_UNIT-1) / MGC_DIRTY_MASK_BIT_PER_UNIT];
 };
 
 struct chunk_gen_mesh_buffer;

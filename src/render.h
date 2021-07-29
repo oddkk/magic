@@ -63,7 +63,7 @@ bool
 shader_link(GLuint program);
 
 #define BITS_PER_UNIT (sizeof(u64)*8)
-#define LAYER_MASK_UNITS ((CHUNK_LAYER_NUM_TILES + BITS_PER_UNIT-1) / BITS_PER_UNIT)
+#define LAYER_MASK_UNITS ((RENDER_CHUNK_LAYER_NUM_TILES + BITS_PER_UNIT-1) / BITS_PER_UNIT)
 struct layer_neighbours {
 	u8 layerId;
 	u64 nw[LAYER_MASK_UNITS];
@@ -77,19 +77,26 @@ struct layer_neighbours {
 	u64 below[LAYER_MASK_UNITS];
 };
 
+struct render_chunk_gen_mesh_buffer {
+	u64 solidMask[(RENDER_CHUNK_NUM_TILES + BITS_PER_UNIT-1) / BITS_PER_UNIT];
+	u8 tileColor[RENDER_CHUNK_NUM_TILES * 3];
+};
+
 // Keep the buffers for chunk generating to avoid reallocation.
 struct chunk_gen_mesh_buffer {
-	u64 solidMask[sizeof(u64) * CHUNK_NUM_TILES / BITS_PER_UNIT];
-	u8 cullMask[sizeof(u8) * 8*CHUNK_NUM_TILES];
-	u8 tileColor[sizeof(u8) * CHUNK_NUM_TILES * 3];
+	struct render_chunk_gen_mesh_buffer render_chunks[RENDER_CHUNKS_PER_CHUNK];
+	u8 cullMask[sizeof(u8) * 8*RENDER_CHUNK_NUM_TILES];
 	struct layer_neighbours neighbourMasks[3];
 };
 
 #undef LAYER_MASK_UNITS
 #undef BITS_PER_UNIT
 
+struct mgc_chunk_gen_mesh_result {
+	struct mgc_mesh mesh[RENDER_CHUNKS_PER_CHUNK];
+};
 
-struct mgc_mesh
+struct mgc_chunk_gen_mesh_result
 chunk_gen_mesh(struct chunk_gen_mesh_buffer *buffer, struct mgc_material_table *materials, struct mgc_chunk *cnk);
 
 #endif
