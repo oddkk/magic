@@ -34,16 +34,31 @@ struct mgc_chunk {
 	v3i location;
 
 	// column-major
-	Tile tiles[CHUNK_NUM_TILES];
+	struct mgc_tile tiles[CHUNK_NUM_TILES];
 };
 
 size_t
 chunkCoordToIndex(v3i coord);
 
 v3i
+mgc_chunk_index_to_coord(size_t i);
+
+v3i
 mgc_chunk_coord_to_world(v3i);
 
-Tile *
+v3i
+mgc_coord_tile_to_chunk(v3i p);
+
+struct mgc_aabbi
+mgc_coord_bounds_tile_to_chunk(struct mgc_aabbi b);
+
+v3i
+mgc_coord_chunk_to_tile(v3i p);
+
+v3i
+mgc_coord_tile_to_chunk_local(v3i p);
+
+struct mgc_tile *
 chunkTile(struct mgc_chunk *, v3i localCoord);
 
 #endif

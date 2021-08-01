@@ -62,7 +62,7 @@ mgc_chunk_cache_alloc_chunk(struct mgc_chunk_cache *cache)
 	return &entry->chunk;
 }
 
-static ssize_t
+ssize_t
 mgc_chunk_cache_find(struct mgc_chunk_cache *cache, v3i coord)
 {
 	for (size_t i = 0; i < cache->head; i++) {

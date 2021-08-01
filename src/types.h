@@ -130,6 +130,7 @@ mgc_cube_to_axial(v3i p) { v2i r; r.x = p.x; r.y = p.y; return r; }
 static inline v3i
 mgc_axial_to_cube(v2i p) { v3i r; r.x = p.x; r.y = p.y; r.z = -p.x-p.y; return r; }
 
+// Bounds includes min to max-1
 struct mgc_aabbi {
 	v3i min, max;
 };
@@ -139,6 +140,9 @@ mgc_aabbi_from_extents(v3i p0, v3i p1);
 
 struct mgc_aabbi
 mgc_aabbi_from_point(v3i p);
+
+struct mgc_aabbi
+mgc_aabbi_from_radius(v3i c, unsigned int r);
 
 struct mgc_aabbi
 mgc_aabbi_extend_bounds(struct mgc_aabbi lhs, struct mgc_aabbi rhs);

@@ -321,7 +321,7 @@ chunk_gen_mesh(struct chunk_gen_mesh_buffer *buffer, struct mgc_material_table *
 		u64 *solidMask = rbuffer->solidMask;
 		u8 *tileColor = rbuffer->tileColor;
 
-		Tile *tile = &cnk->tiles[i];
+		struct mgc_tile *tile = &cnk->tiles[i];
 		Material *mat = mgc_mat_get(materials, tile->material);
 		solidMask[r_i/BITS_PER_UNIT] |= (mat->solid ? 1ULL : 0ULL) << (r_i % BITS_PER_UNIT);
 

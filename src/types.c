@@ -28,6 +28,15 @@ mgc_aabbi_from_extents(v3i p0, v3i p1)
 }
 
 struct mgc_aabbi
+mgc_aabbi_from_radius(v3i c, unsigned int r)
+{
+	return mgc_aabbi_from_extents(
+		V3i(c.x - r, c.y - r, c.z - r),
+		V3i(c.x + r, c.y + r, c.z + r)
+	);
+}
+
+struct mgc_aabbi
 mgc_aabbi_from_point(v3i p)
 {
 	struct mgc_aabbi result = {0};

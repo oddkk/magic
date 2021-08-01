@@ -11,6 +11,7 @@
 
 #include "world.h"
 #include "registry.h"
+#include "sim.h"
 
 #include "world_def/world_def.h"
 #include "world_def/shape.h"
@@ -330,7 +331,8 @@ int main(int argc, char *argv[])
 			c.position = v3_add(c.position, move_final);
 		}
 
-		mgc_chunk_cache_tick(&chunk_cache);
+		v3i sim_center = V3i(0, 0, 0);
+		mgc_sim_tick(sim_center, &chunk_cache, &reg);
 
 		size_t render_queue_length = 0;
 		mgc_chunk_cache_make_render_queue(

@@ -1,6 +1,7 @@
 #ifndef MAGIC_CHUNK_CACHE_H
 #define MAGIC_CHUNK_CACHE_H
 
+#include "intdef.h"
 #include "types.h"
 #include "mesh.h"
 #include "arena.h"
@@ -66,6 +67,9 @@ mgc_chunk_cache_invalidate(struct mgc_chunk_cache *, v3i coord);
 
 void
 mgc_chunk_cache_tick(struct mgc_chunk_cache *cache);
+
+ssize_t
+mgc_chunk_cache_find(struct mgc_chunk_cache *cache, v3i coord);
 
 struct mgc_chunk_render_entry {
 	struct mgc_mesh mesh;
