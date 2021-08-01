@@ -32,7 +32,11 @@ mgcd_print_token(struct mgcd_token *tok)
 			break;
 
 		case MGCD_TOK_INTEGER_LIT:
+#ifdef _WIN32
 			printf(" %lli", tok->integer_lit);
+#else
+			printf(" %li", tok->integer_lit);
+#endif
 			break;
 
 		case MGCD_TOK_STRING_LIT:

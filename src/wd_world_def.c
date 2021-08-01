@@ -346,6 +346,142 @@ mgcd_entry_type_from_ext(struct mgcd_context *ctx, struct atom *ext)
 	}
 }
 
+struct mgcd_resource_ctx {
+	size_t path_i;
+	size_t remaining_path_i;
+	mgcd_resource_id file_res;
+	mgcd_file_id fid_res;
+	mgcd_resource_id scope_id;
+
+	bool skip;
+	bool last_skipped;
+};
+
+static int
+mgcd_resource_process_file(struct mgcd_context *ctx, struct mgcd_resource_ctx *res_ctx, struct atom *current_segment, size_t num_segments, struct string name_str, struct string path_str, bool is_dir)
+{
+	struct atom *name = NULL, *ext = NULL;
+
+	if (!is_dir) {
+		struct string ext_str = {0};
+		mgcd_extract_extension(name_str,
+				&name_str, &ext_str);
+		if (ext_str.length > 0) {
+			ext = atom_create(ctx->atom_table, ext_str);
+		}
+	}
+
+	name = atom_create(ctx->atom_table, name_str);
+
+	if (res_ctx->file_res != MGCD_RESOURCE_NONE && name == current_segment) {
+		struct mgcd_resource *found_res;
+		found_res = mgcd_resource_get(ctx, res_ctx->file_res);
+
+		/*
+		   struct string dup_full_path;
+		   dup_full_path.text = f->fts_path;
+		   dup_full_path.length = f->fts_pathlen;
+		   mgc_error(ctx->err, MGC_NO_LOC,
+		   "Ambigous scope name '%.*s' and '%.*s'.",
+		   LIT(found_res->full_path), LIT(dup_full_path));
+		   */
+		// TODO: Include asset path in error message.
+		mgc_error(ctx->err, MGC_NO_LOC,
+				"Ambigous scope name.");
+		return -1;
+	}
+
+	if (name == current_segment) {
+		int err;
+		mgcd_resource_id new_id;
+		err = mgcd_resource_get_or_create(ctx,
+				res_ctx->scope_id, name, &new_id);
+		if (err < 0) {
+			return -1;
+		}
+
+		res_ctx->scope_id = new_id;
+
+		if (!is_dir) {
+			res_ctx->file_res = new_id;
+			res_ctx->remaining_path_i = res_ctx->path_i + 1;
+		} else {
+			res_ctx->path_i += 1;
+
+			if (res_ctx->path_i >= num_segments) {
+				res_ctx->file_res = new_id;
+				res_ctx->remaining_path_i = res_ctx->path_i + 1;
+				res_ctx->skip = true;
+				// Do not skip the decrement as we just
+				// incremented path_i.
+			}
+		}
+
+		if (err > 0) {
+			// A new resource was created. Fill it out.
+			struct mgcd_resource *new_res;
+			new_res = mgcd_resource_get(ctx, new_id);
+
+			if (!is_dir) {
+				enum mgcd_entry_type type = mgcd_entry_type_from_ext(ctx, ext);
+
+				char real_path_buffer[PATH_MAX+1];
+				if (!realpath(path_str.text, real_path_buffer)) {
+					perror("realpath");
+					return -1;
+				}
+
+				struct string real_path = {0};
+				real_path.text = real_path_buffer;
+				real_path.length = strlen(real_path_buffer);
+
+				struct atom *file_atom;
+				file_atom = atom_create(ctx->atom_table, real_path);
+
+				mgcd_file_id fid;
+				int err;
+				err = mgcd_file_get_or_create(ctx, file_atom, &fid);
+
+				if (err < 0) {
+					return -1;
+				}
+
+				// The file should not already exsist as a
+				// matching resource was not discovered.
+				assert(err != 0);
+
+				new_res->file = fid;
+				res_ctx->fid_res = fid;
+
+				struct mgcd_file *file;
+				file = mgcd_file_get(ctx, fid);
+				file->disposition = type;
+				file->resource = new_id;
+				mgcd_init_job_resolve(ctx, type, new_id);
+
+				/*
+				   new_res->names_resolved = mgcd_job_res_names(ctx, new_id);
+				   new_res->finalized = mgcd_job_res_finalize(ctx, new_id);
+				   mgcd_job_dependency(ctx,
+				   new_res->names_resolved,
+				   new_res->finalized);
+				   */
+				mgcd_job_dependency(ctx,
+						file->finalized,
+						new_res->names_resolved);
+			} else {
+				new_res->type = MGCD_ENTRY_SCOPE;
+				new_res->scope.children = MGCD_RESOURCE_NONE;
+			}
+		}
+	} else {
+		res_ctx->skip = true;
+		res_ctx->last_skipped = true;
+	}
+
+	return 0;
+}
+
 mgcd_resource_id
 mgcd_request_resource(struct mgcd_context *ctx, mgcd_job_id req_job, struct mgc_location req_loc,
 		mgcd_resource_id origin_scope, struct mgcd_path path)
@@ -405,10 +541,17 @@ mgcd_request_resource(struct mgcd_context *ctx, mgcd_job_id req_job, struct mgc_
 
 	int ret_err = 0;
 
+	struct mgcd_resource_ctx res_ctx = {0};
+	res_ctx.scope_id = ctx->root_scope;
+	res_ctx.file_res = MGCD_RESOURCE_NONE;
+	res_ctx.fid_res = MGCD_FILE_NONE;
+
+	/*
 	size_t path_i = 0;
 	size_t remaining_path_i = 0;
 	mgcd_resource_id file_res = MGCD_RESOURCE_NONE;
 	mgcd_file_id fid_res = MGCD_FILE_NONE;
+	*/
 
 #ifdef linux
 	FTS *ftsp;
@@ -418,14 +561,13 @@ mgcd_request_resource(struct mgcd_context *ctx, mgcd_job_id req_job, struct mgc_
 		return -1;
 	}
 
-	scope_id = ctx->root_scope;
-
-	bool last_skipped = false;
+	// scope_id = ctx->root_scope;
+	// bool last_skipped = false;
 
 	FTSENT *f;
 	while ((f = fts_read(ftsp)) != NULL) {
-		assert(path_i < real_path.num_segments);
-		struct atom *current_segment = real_path.segments[path_i];
+		assert(res_ctx.path_i < real_path.num_segments);
+		struct atom *current_segment = real_path.segments[res_ctx.path_i];
 
 		switch (f->fts_info) {
 			case FTS_F:
@@ -436,131 +578,34 @@ mgcd_request_resource(struct mgcd_context *ctx, mgcd_job_id req_job, struct mgc_
 						break;
 					}
 
-					struct string name_str = {0};
-					struct atom *name = NULL, *ext = NULL;
+					bool is_dir = f->fts_info == FTS_D;
 
+					struct string name_str = {0};
 					name_str.text = f->fts_name;
 					name_str.length = f->fts_namelen;
 
-					if (f->fts_info == FTS_F) {
-						struct string ext_str = {0};
-						mgcd_extract_extension(name_str,
-								&name_str, &ext_str);
-						if (ext_str.length > 0) {
-							ext = atom_create(ctx->atom_table, ext_str);
-						}
-					}
+					struct string path_str = {0};
+					path_str.text = f->fts_path;
+					path_str.length = f->fts_pathlen;
 
-					name = atom_create(ctx->atom_table, name_str);
-
-					if (file_res != MGCD_RESOURCE_NONE && name == current_segment) {
-						struct mgcd_resource *found_res;
-						found_res = mgcd_resource_get(ctx, file_res);
-
-						/*
-						struct string dup_full_path;
-						dup_full_path.text = f->fts_path;
-						dup_full_path.length = f->fts_pathlen;
-						mgc_error(ctx->err, MGC_NO_LOC,
-								"Ambigous scope name '%.*s' and '%.*s'.",
-								LIT(found_res->full_path), LIT(dup_full_path));
-						*/
-						// TODO: Include asset path in error message.
-						mgc_error(ctx->err, MGC_NO_LOC,
-								"Ambigous scope name.");
-						ret_err = -1;
-					}
-
-					if (name == current_segment) {
-						int err;
-						mgcd_resource_id new_id;
-						err = mgcd_resource_get_or_create(ctx,
-								scope_id, name, &new_id);
-						if (err < 0) {
-							ret_err = -1;
-							break;
-						}
-
-						scope_id = new_id;
-
-						if (f->fts_info == FTS_F) {
-							file_res = new_id;
-							remaining_path_i = path_i + 1;
-						} else {
-							path_i += 1;
-
-							if (path_i >= real_path.num_segments) {
-								file_res = new_id;
-								remaining_path_i = path_i + 1;
-								fts_set(ftsp, f, FTS_SKIP);
-								// Do not skip the decrement as we just
-								// incremented path_i.
-							}
-						}
-
-						if (err > 0) {
-							// A new resource was created. Fill it out.
-							struct mgcd_resource *new_res;
-							new_res = mgcd_resource_get(ctx, new_id);
-
-							if (f->fts_info == FTS_F) {
-								enum mgcd_entry_type type = mgcd_entry_type_from_ext(ctx, ext);
-
-								char real_path_buffer[PATH_MAX+1];
-								if (!realpath(f->fts_path, real_path_buffer)) {
-									perror("realpath");
-									ret_err = -1;
-									break;
-								}
-
-								struct string real_path = {0};
-								real_path.text = real_path_buffer;
-								real_path.length = strlen(real_path_buffer);
-
-								struct atom *file_atom;
-								file_atom = atom_create(ctx->atom_table, real_path);
-
-								mgcd_file_id fid;
-								int err;
-								err = mgcd_file_get_or_create(ctx, file_atom, &fid);
-
-								if (err < 0) {
-									ret_err = -1;
-									break;
-								}
-
-								// The file should not already exsist as a
-								// matching resource was not discovered.
-								assert(err != 0);
-
-								new_res->file = fid;
-								fid_res = fid;
-
-								struct mgcd_file *file;
-								file = mgcd_file_get(ctx, fid);
-								file->disposition = type;
-								file->resource = new_id;
-								mgcd_init_job_resolve(ctx, type, new_id);
-
-								/*
-								new_res->names_resolved = mgcd_job_res_names(ctx, new_id);
-								new_res->finalized = mgcd_job_res_finalize(ctx, new_id);
-								mgcd_job_dependency(ctx,
-										new_res->names_resolved,
-										new_res->finalized);
-								*/
-								mgcd_job_dependency(ctx,
-										file->finalized,
-										new_res->names_resolved);
-							} else {
-								new_res->type = MGCD_ENTRY_SCOPE;
-								new_res->scope.children = MGCD_RESOURCE_NONE;
-							}
-						}
-
-					} else {
+					res_ctx.skip = false;
+					int err;
+					err = mgcd_resource_process_file(
+						ctx,
+						&res_ctx,
+						current_segment,
+						real_path.num_segments,
+						name_str,
+						path_str,
+						is_dir
+					);
+					if (res_ctx.skip) {
 						fts_set(ftsp, f, FTS_SKIP);
-						last_skipped = true;
+					}
+
+					if (err) {
+						ret_err = err;
+						break;
 					}
 				}
 				break;
@@ -570,12 +615,12 @@ mgcd_request_resource(struct mgcd_context *ctx, mgcd_job_id req_job, struct mgc_
 					// The root of the asset dir should be the root scope.
 					break;
 				}
-				if (last_skipped) {
-					last_skipped = false;
+				if (res_ctx.last_skipped) {
+					res_ctx.last_skipped = false;
 					break;
 				}
-				assert(path_i > 0);
-				path_i -= 1;
+				assert(res_ctx.path_i > 0);
+				res_ctx.path_i -= 1;
 				break;
 
 			case FTS_ERR:
@@ -593,7 +638,7 @@ mgcd_request_resource(struct mgcd_context *ctx, mgcd_job_id req_job, struct mgc_
 
 #endif
 
-	if (file_res == MGCD_RESOURCE_NONE) {
+	if (res_ctx.file_res == MGCD_RESOURCE_NONE) {
 		struct arena *tmp_str_mem = ctx->tmp_mem;
 		arena_mark cp = arena_checkpoint(tmp_str_mem);
 		struct string path_str;
@@ -606,13 +651,13 @@ mgcd_request_resource(struct mgcd_context *ctx, mgcd_job_id req_job, struct mgc_
 		return MGCD_RESOURCE_NONE;
 	}
 
-	if (ret_err || file_res == MGCD_RESOURCE_NONE) {
+	if (ret_err || res_ctx.file_res == MGCD_RESOURCE_NONE) {
 		return MGCD_RESOURCE_NONE;
 	}
 
 	// Traverse the remaining path to find the requested resource in the file.
-	mgcd_resource_id result_res = file_res;
-	for (size_t i = remaining_path_i; i < path.num_segments; i++) {
+	mgcd_resource_id result_res = res_ctx.file_res;
+	for (size_t i = res_ctx.remaining_path_i; i < path.num_segments; i++) {
 		struct atom *ident = path.segments[i];
 
 		int err;
@@ -628,7 +673,7 @@ mgcd_request_resource(struct mgcd_context *ctx, mgcd_job_id req_job, struct mgc_
 		new_res = mgcd_resource_get(ctx, new_id);
 		new_res->requested = true;
 		new_res->dirty = true;
-		new_res->file = fid_res;
+		new_res->file = res_ctx.fid_res;
 
 		if (err > 0) {
 			new_res->type = MGCD_ENTRY_UNKNOWN;
