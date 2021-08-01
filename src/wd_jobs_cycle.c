@@ -1,7 +1,7 @@
-#include "jobs.h"
-#include "jobs_internal.h"
-#include "../utils.h"
-#include "../term_color.h"
+#include "wd_jobs.h"
+#include "wd_jobs_internal.h"
+#include "utils.h"
+#include "term_color.h"
 
 struct mgcd_jobc_vertex {
 	mgcd_job_id job_id;

@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include <string.h>
-#include "lexer.h"
-#include "world_def.h"
-#include "parser.h"
-#include "../utils.h"
+#include "wd_lexer.h"
+#include "wd_world_def.h"
+#include "wd_parser.h"
+#include "utils.h"
 
 #define LEX_BUFFER_SIZE (4096)
 #define LEX_BUFFER_MAX_FILL (4096)

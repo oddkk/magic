@@ -1,8 +1,8 @@
 #ifndef MAGIC_WORLD_DEF_AREA_H
 #define MAGIC_WORLD_DEF_AREA_H
 
-#include "world_def.h"
-#include "../area.h"
+#include "wd_world_def.h"
+#include "area.h"
 
 enum mgcd_area_op_kind {
 	MGCD_AREA_ADD,

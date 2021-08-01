@@ -13,11 +13,11 @@
 #include "registry.h"
 #include "sim.h"
 
-#include "world_def/world_def.h"
-#include "world_def/shape.h"
-#include "world_def/lexer.h"
-#include "world_def/jobs.h"
-#include "world_def/path.h"
+#include "wd_world_def.h"
+#include "wd_shape.h"
+#include "wd_lexer.h"
+#include "wd_jobs.h"
+#include "wd_path.h"
 
 static bool shouldQuit = false;
 

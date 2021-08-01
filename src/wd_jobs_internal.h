@@ -1,7 +1,7 @@
 #ifndef MAGIC_WORLD_DEF_JOBS_INTERNAL_H
 #define MAGIC_WORLD_DEF_JOBS_INTERNAL_H
 
-#include "jobs.h"
+#include "wd_jobs.h"
 
 struct mgcd_job *
 get_job(struct mgcd_context *ctx, mgcd_job_id id);

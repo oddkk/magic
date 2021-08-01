@@ -1,8 +1,8 @@
 #ifndef MAGIC_WORLD_DEF_COMPILER_H
 #define MAGIC_WORLD_DEF_COMPILER_H
 
-#include "world_def.h"
-#include "../config.h"
+#include "wd_world_def.h"
+#include "config.h"
 
 struct mgcd_job_nop_data {
 	mgcd_job_id *id_ref;

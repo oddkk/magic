@@ -1,13 +1,13 @@
 #include <stdio.h>
 #include <string.h>
-#include "parser.h"
-#include "lexer.h"
-#include "../utils.h"
-#include "../config.h"
+#include "wd_parser.h"
+#include "wd_lexer.h"
+#include "utils.h"
+#include "config.h"
 
-#include "shape.h"
-#include "area.h"
-#include "material.h"
+#include "wd_shape.h"
+#include "wd_area.h"
+#include "wd_material.h"
 
 void
 mgcd_parse_init(struct mgcd_parser *parser,

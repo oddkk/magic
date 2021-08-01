@@ -1,8 +1,8 @@
 #ifndef MAGIC_WORLD_DEF_MATERIAL_H
 #define MAGIC_WORLD_DEF_MATERIAL_H
 
-#include "world_def.h"
-#include "../material.h"
+#include "wd_world_def.h"
+#include "material.h"
 
 struct mgcd_material {
 	struct atom *name;

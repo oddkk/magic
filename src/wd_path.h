@@ -1,8 +1,8 @@
 #ifndef MAGIC_WORLD_DEF_PATH_H
 #define MAGIC_WORLD_DEF_PATH_H
 
-#include "../atom.h"
-#include "../arena.h"
+#include "atom.h"
+#include "arena.h"
 
 enum mgcd_path_origin {
 	MGCD_PATH_ABS,

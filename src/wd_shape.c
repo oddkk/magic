@@ -1,5 +1,5 @@
-#include "shape.h"
-#include "parser.h"
+#include "wd_shape.h"
+#include "wd_parser.h"
 #include <string.h>
 
 size_t

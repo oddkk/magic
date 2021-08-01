@@ -1,9 +1,9 @@
 #ifndef MAGIC_WORLD_DEF_PARSER_H
 #define MAGIC_WORLD_DEF_PARSER_H
 
-#include "world_def.h"
-#include "vars.h"
-#include "../errors.h"
+#include "wd_world_def.h"
+#include "wd_vars.h"
+#include "errors.h"
 
 #define MGCD_TOKEN_TYPES \
 	TOKEN(ERROR) \

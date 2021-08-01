@@ -2,9 +2,9 @@
 #include "world.h"
 #include "area.h"
 
-#include "world_def/world_def.h"
-#include "world_def/jobs.h"
-#include "world_def/material.h"
+#include "wd_world_def.h"
+#include "wd_jobs.h"
+#include "wd_material.h"
 
 void
 mgc_world_src_world_def_init(

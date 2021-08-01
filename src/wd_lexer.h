@@ -2,9 +2,9 @@
 #define MAGIC_WORLD_DEF_LEXER_H
 
 #include <stdio.h>
-#include "../types.h"
-#include "../string.h"
-#include "../errors.h"
+#include "types.h"
+#include "string.h"
+#include "errors.h"
 
 struct mgcd_lexer {
 	FILE *fp;

@@ -1,9 +1,9 @@
-#include "path.h"
-#include "world_def.h"
-#include "../str.h"
-#include "../arena.h"
-#include "../types.h"
-#include "../utils.h"
+#include "wd_path.h"
+#include "wd_world_def.h"
+#include "str.h"
+#include "arena.h"
+#include "types.h"
+#include "utils.h"
 #include <stdio.h>
 #include <string.h>
 

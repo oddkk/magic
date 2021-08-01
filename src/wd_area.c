@@ -1,6 +1,6 @@
-#include "area.h"
-#include "parser.h"
-#include "../arena.h"
+#include "wd_area.h"
+#include "wd_parser.h"
+#include "arena.h"
 #include <string.h>
 
 static struct mgcd_area_op *

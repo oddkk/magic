@@ -1,6 +1,6 @@
-#include "vars.h"
-#include "../str.h"
-#include "../utils.h"
+#include "wd_vars.h"
+#include "str.h"
+#include "utils.h"
 #include <stdio.h>
 
 static struct string mgcd_type_names[] = {

@@ -1,8 +1,8 @@
 #ifndef MAGIC_WORLD_DEF_SHAPE_H
 #define MAGIC_WORLD_DEF_SHAPE_H
 
-#include "world_def.h"
-#include "../shape.h"
+#include "wd_world_def.h"
+#include "shape.h"
 
 typedef int mgcd_heightmap_id;
 

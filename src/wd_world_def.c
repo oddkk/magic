@@ -1,13 +1,13 @@
-#include "world_def.h"
-#include "vars.h"
-#include "shape.h"
-#include "area.h"
-#include "material.h"
-#include "jobs.h"
-#include "lexer.h"
-#include "parser.h"
-#include "../utils.h"
-#include "../registry.h"
+#include "wd_world_def.h"
+#include "wd_vars.h"
+#include "wd_shape.h"
+#include "wd_area.h"
+#include "wd_material.h"
+#include "wd_jobs.h"
+#include "wd_lexer.h"
+#include "wd_parser.h"
+#include "utils.h"
+#include "registry.h"
 
 #include <string.h>
 #include <errno.h>

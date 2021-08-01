@@ -1,8 +1,8 @@
-#include "jobs.h"
-#include "jobs_internal.h"
-#include "../utils.h"
-#include "../dlist.h"
-#include "../term_color.h"
+#include "wd_jobs.h"
+#include "wd_jobs_internal.h"
+#include "utils.h"
+#include "dlist.h"
+#include "term_color.h"
 
 #include <stdlib.h>
 #include <string.h>

@@ -1,5 +1,5 @@
-#include "material.h"
-#include "parser.h"
+#include "wd_material.h"
+#include "wd_parser.h"
 
 bool
 mgcd_parse_material_op(

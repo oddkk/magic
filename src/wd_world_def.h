@@ -1,12 +1,12 @@
 #ifndef MAGIC_WORLD_DEF_H
 #define MAGIC_WORLD_DEF_H
 
-#include "../types.h"
-#include "../atom.h"
-#include "../str.h"
-#include "../errors.h"
-#include "vars.h"
-#include "path.h"
+#include "types.h"
+#include "atom.h"
+#include "str.h"
+#include "errors.h"
+#include "wd_vars.h"
+#include "wd_path.h"
 #include <stdio.h>
 
 typedef int mgcd_job_id;

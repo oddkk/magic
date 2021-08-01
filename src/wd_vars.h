@@ -1,7 +1,7 @@
 #ifndef MAGIC_WORLD_DEF_VARS_H
 #define MAGIC_WORLD_DEF_VARS_H
 
-#include "../types.h"
+#include "types.h"
 
 typedef int mgcd_var_id;
 typedef int mgcd_resource_id;
