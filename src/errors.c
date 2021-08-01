@@ -65,6 +65,7 @@ level_prefix(enum mgc_error_level lvl)
 		case MGC_WARNING:  return TC(TC_YELLOW, "warning") ": ";
 		case MGC_INFO:     return TC(TC_BRIGHT_BLUE, "info") ": ";
 		case MGC_APPENDAGE: return "";
+		default: return "";
 	}
 }
 
@@ -119,7 +120,7 @@ mgc_msgv(struct mgc_error_context *err, struct mgc_location loc,
 #endif
 }
 
-__attribute__((__format__ (__printf__, 3, 4))) void
+FORMAT_FN(3, 4) void
 mgc_error(struct mgc_error_context *err, struct mgc_location loc, const char *fmt, ...)
 {
 	va_list ap;
@@ -128,7 +129,7 @@ mgc_error(struct mgc_error_context *err, struct mgc_location loc, const char *fm
 	va_end(ap);
 }
 
-__attribute__((__format__ (__printf__, 3, 4))) void
+FORMAT_FN(3, 4) void
 mgc_warning(struct mgc_error_context *err, struct mgc_location loc, const char *fmt, ...)
 {
 	va_list ap;
@@ -137,7 +138,7 @@ mgc_warning(struct mgc_error_context *err, struct mgc_location loc, const char *
 	va_end(ap);
 }
 
-__attribute__((__format__ (__printf__, 3, 4))) void
+FORMAT_FN(3, 4) void
 mgc_info(struct mgc_error_context *err, struct mgc_location loc, const char *fmt, ...)
 {
 	va_list ap;
@@ -146,7 +147,7 @@ mgc_info(struct mgc_error_context *err, struct mgc_location loc, const char *fmt
 	va_end(ap);
 }
 
-__attribute__((__format__ (__printf__, 3, 4))) void
+FORMAT_FN(3, 4) void
 mgc_appendage(struct mgc_error_context *err, struct mgc_location loc, const char *fmt, ...)
 {
 	va_list ap;
@@ -172,7 +173,10 @@ print_errors(struct mgc_error_context *err)
 
 			// Print nothing if the error region has no extent.
 			if (msg->loc.byte_to > 0 && msg->loc.byte_from < (msg->loc.byte_to-1)) {
-				char file_name_cstr[file_name.length + 1];
+				arena_mark cp = arena_checkpoint(err->transient_arena);
+				char *file_name_cstr;
+				file_name_cstr = arena_alloc(err->transient_arena, file_name.length + 1);
+
 				memcpy(file_name_cstr, file_name.text, file_name.length);
 				file_name_cstr[file_name.length] = 0;
 
@@ -180,6 +184,8 @@ print_errors(struct mgc_error_context *err)
 				if (!fp) {
 					file_error = true;
 				}
+
+				arena_reset(err-> transient_arena, cp);
 			}
 		}
 
@@ -229,12 +235,14 @@ print_errors(struct mgc_error_context *err)
 
 			size_t buffer_begin  = line_begin;
 			size_t buffer_length = line_end - line_begin;
-			char buffer[buffer_length];
+
+			arena_mark cp = arena_checkpoint(err->transient_arena);
+			char *buffer = arena_alloc(err->transient_arena, buffer_length);
 
 			fseek(fp, line_begin, SEEK_SET);
 			fread(buffer, 1, buffer_length, fp);
 
-			for (ssize_t n = msg->loc.byte_from; n >= (ssize_t)buffer_begin; n--) {
+			for (isize n = msg->loc.byte_from; n >= (isize)buffer_begin; n--) {
 				// TODO: Handle all kinds of line break.
 				if (buffer[n - buffer_begin] == '\n') {
 					line_begin = n + 1;
@@ -280,6 +288,7 @@ print_errors(struct mgc_error_context *err)
 
 			fprintf(out, "\n\n");
 
+			arena_reset(err->transient_arena, cp);
 			fclose(fp);
 
 		} else if (file_error) {

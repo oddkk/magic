@@ -104,11 +104,11 @@ render_initialize(struct render_context *ctx)
 
 	const float hexData[] = {
 		0.0f, hexR,
-		 cos(30.0 * M_PI / 180.0) * hexR,  sin(30.0 * M_PI / 180.0) * hexR,
-		 cos(30.0 * M_PI / 180.0) * hexR, -sin(30.0 * M_PI / 180.0) * hexR,
+		 cos(30.0 * PI / 180.0) * hexR,  sin(30.0 * PI / 180.0) * hexR,
+		 cos(30.0 * PI / 180.0) * hexR, -sin(30.0 * PI / 180.0) * hexR,
 		0.0f, -hexR,
-		-cos(30.0 * M_PI / 180.0) * hexR, -sin(30.0 * M_PI / 180.0) * hexR,
-		-cos(30.0 * M_PI / 180.0) * hexR,  sin(30.0 * M_PI / 180.0) * hexR,
+		-cos(30.0 * PI / 180.0) * hexR, -sin(30.0 * PI / 180.0) * hexR,
+		-cos(30.0 * PI / 180.0) * hexR,  sin(30.0 * PI / 180.0) * hexR,
 	};
 
 	unsigned int hexDataElements[] = {
@@ -273,7 +273,7 @@ tilesMaskMove(u64 *mask, size_t i, i64 movement)
 size_t
 count_set_bits_u8(u8 v)
 {
-#if 1
+#if __GNUC__
 	return __builtin_popcount(v);
 #else
 	size_t count = 0;
@@ -426,11 +426,11 @@ chunk_gen_mesh(struct chunk_gen_mesh_buffer *buffer, struct mgc_material_table *
 		}
 
 		if (numTriangles > 0) {
-			const f32 normalX = sin(30.0 * M_PI / 180.0);
-			const f32 normalY = cos(30.0 * M_PI / 180.0);
+			const f32 normalX = sin(30.0 * PI / 180.0);
+			const f32 normalY = cos(30.0 * PI / 180.0);
 
-			const f32 xOffset = cos(30.0 * M_PI / 180.0) * hexR;
-			const f32 yOffset = sin(30.0 * M_PI / 180.0) * hexR;
+			const f32 xOffset = cos(30.0 * PI / 180.0) * hexR;
+			const f32 yOffset = sin(30.0 * PI / 180.0) * hexR;
 
 			const v3 hexVerts[] = {
 				V3(0.0f,     hexH,  hexR),

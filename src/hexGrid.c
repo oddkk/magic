@@ -7,9 +7,9 @@ float hexStaggerX;
 void
 hexGridInitialize()
 {
-	hexStrideX = cos(30.0 * M_PI / 180.0) * 2.0f * hexR;
-	hexStrideY = sin(30.0 * M_PI / 180.0) * hexR + hexR;
-	hexStaggerX = cos(30.0 * M_PI / 180.0) * hexR;
+	hexStrideX = cos(30.0 * PI / 180.0) * 2.0f * hexR;
+	hexStrideY = sin(30.0 * PI / 180.0) * hexR + hexR;
+	hexStaggerX = cos(30.0 * PI / 180.0) * hexR;
 }
 
 v2

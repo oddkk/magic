@@ -13,4 +13,10 @@ typedef struct {
 		.b = ((hex) >>  0) & 0xff, \
 	})
 
+#define NOCAST_COLOR_HEX(hex) {\
+		.r = ((hex) >> 16) & 0xff, \
+		.g = ((hex) >>  8) & 0xff, \
+		.b = ((hex) >>  0) & 0xff, \
+	}
+
 #endif

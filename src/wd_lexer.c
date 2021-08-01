@@ -9,7 +9,7 @@
 #define LEX_BUFFER_MAX_FILL (4096)
 
 static struct string mgcd_token_names[] = {
-#define TOKEN(name) STR(#name),
+#define TOKEN(name) NOCAST_STR(#name),
 MGCD_TOKEN_TYPES
 #undef TOKEN
 };
@@ -32,7 +32,7 @@ mgcd_print_token(struct mgcd_token *tok)
 			break;
 
 		case MGCD_TOK_INTEGER_LIT:
-			printf(" %li", tok->integer_lit);
+			printf(" %lli", tok->integer_lit);
 			break;
 
 		case MGCD_TOK_STRING_LIT:

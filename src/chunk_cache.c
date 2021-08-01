@@ -62,7 +62,7 @@ mgc_chunk_cache_alloc_chunk(struct mgc_chunk_cache *cache)
 	return &entry->chunk;
 }
 
-ssize_t
+isize
 mgc_chunk_cache_find(struct mgc_chunk_cache *cache, v3i coord)
 {
 	for (size_t i = 0; i < cache->head; i++) {
@@ -80,7 +80,7 @@ mgc_chunk_cache_find(struct mgc_chunk_cache *cache, v3i coord)
 void
 mgc_chunk_cache_request(struct mgc_chunk_cache *cache, v3i coord)
 {
-	ssize_t chunk_i;
+	isize chunk_i;
 	chunk_i = mgc_chunk_cache_find(cache, coord);
 
 	if (chunk_i >= 0) {

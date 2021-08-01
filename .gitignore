@@ -1,1 +1,7 @@
 magic
+magic.exe
+magic.ilk
+magic.pdb
+/build/
+*~
+*.swp

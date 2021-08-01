@@ -4,6 +4,12 @@
 #include "intdef.h"
 #include <stdarg.h>
 
+#ifdef __GNUC__
+#define FORMAT_FN(str_idx, first_arg) __attribute__((__format__ (__printf__, str_idx, first_arg)))
+#else
+#define FORMAT_FN(str_idx, first_arg)
+#endif
+
 struct string {
 	char *text;
 	size_t length;
@@ -12,6 +18,7 @@ struct string {
 #define LIT(x) ((int)(x).length),((char*)(x).text)
 #define STR(cstr) (struct string){cstr, sizeof(cstr)-1}
 #define STR_BE(begin, end) (struct string){(begin), (end)-(begin)}
+#define NOCAST_STR(s) {s,sizeof(s)-1}
 
 #define STR_EMPTY ((struct string){NULL, 0})
 
@@ -24,16 +31,14 @@ int string_duplicate(struct arena *arena, struct string *dest,
 struct string string_duplicate_cstr(char *str);
 
 struct string arena_sprintf(struct arena *, char *fmt, ...)
-// TODO: Make this cross-compiler compliant.
-	__attribute__((__format__ (__printf__, 2, 3)));
+	FORMAT_FN(2, 3);
 
 struct string arena_vsprintf(struct arena *, char *fmt, va_list);
 
 
 int arena_string_append(struct arena *, struct string *, struct string);
 void arena_string_append_sprintf(struct arena *, struct string *, char *fmt, ...)
-// TODO: Make this cross-compiler compliant.
-	__attribute__((__format__ (__printf__, 3, 4)));
+	FORMAT_FN(3, 4);
 void arena_string_append_vsprintf(struct arena *, struct string *, char *fmt, va_list ap);
 
 int64_t string_to_int64_base2(struct string str);

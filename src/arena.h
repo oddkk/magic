@@ -1,7 +1,7 @@
 #ifndef STAGE_ARENA_H
 #define STAGE_ARENA_H
 
-#include "intdef.h"
+#include "types.h"
 
 struct mgc_memory_page {
 	size_t size;

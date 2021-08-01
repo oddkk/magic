@@ -3,7 +3,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+
+#ifdef linux
 #include <signal.h>
+#endif
 
 void print_info(const char *fmt, ...)
 {
@@ -42,7 +45,9 @@ void panic(const char *fmt, ...)
 
 void trap()
 {
+#ifdef linux
 	raise(SIGTRAP);
+#endif
 }
 
 void zero_memory(void *data, size_t length)

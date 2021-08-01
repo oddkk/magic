@@ -67,16 +67,16 @@ void
 mgc_msgv(struct mgc_error_context *, struct mgc_location, enum mgc_error_level,
 		const char *fmt, va_list);
 
-__attribute__((__format__ (__printf__, 3, 4))) void
+FORMAT_FN(3, 4) void
 mgc_error(struct mgc_error_context *, struct mgc_location, const char *fmt, ...);
 
-__attribute__((__format__ (__printf__, 3, 4))) void
+FORMAT_FN(3, 4) void
 mgc_warning(struct mgc_error_context *, struct mgc_location, const char *fmt, ...);
 
-__attribute__((__format__ (__printf__, 3, 4))) void
+FORMAT_FN(3, 4) void
 mgc_info(struct mgc_error_context *, struct mgc_location, const char *fmt, ...);
 
-__attribute__((__format__ (__printf__, 3, 4))) void
+FORMAT_FN(3, 4) void
 mgc_appendage(struct mgc_error_context *, struct mgc_location, const char *fmt, ...);
 
 void

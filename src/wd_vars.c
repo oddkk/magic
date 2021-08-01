@@ -4,7 +4,7 @@
 #include <stdio.h>
 
 static struct string mgcd_type_names[] = {
-#define TYPE(name, type) STR(#name),
+#define TYPE(name, type) NOCAST_STR(#name),
 MGCD_DEF_VAR_TYPES
 #undef TYPE
 };

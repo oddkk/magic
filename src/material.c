@@ -2,31 +2,31 @@
 #include <assert.h>
 
 TraitType defaultTraits[] = {
-	[TRAIT_GAS]        = { STR("gas")        },
-	[TRAIT_DUST]       = { STR("dust")       },
-	[TRAIT_LIQUID]     = { STR("liquid")     },
-	[TRAIT_FLAMABLE]   = { STR("flamable")   },
-	[TRAIT_SOAKABLE]   = { STR("soakable")   },
-	[TRAIT_CONDUCTIVE] = { STR("conductive") },
+	[TRAIT_GAS]        = { NOCAST_STR("gas")        },
+	[TRAIT_DUST]       = { NOCAST_STR("dust")       },
+	[TRAIT_LIQUID]     = { NOCAST_STR("liquid")     },
+	[TRAIT_FLAMABLE]   = { NOCAST_STR("flamable")   },
+	[TRAIT_SOAKABLE]   = { NOCAST_STR("soakable")   },
+	[TRAIT_CONDUCTIVE] = { NOCAST_STR("conductive") },
 };
 
 StatusType defaultStatusTypes[] = {
-	[STATUS_WET]     = { STR("wet")     },
-	[STATUS_BURNING] = { STR("burning") },
-	[STATUS_SHOCKED] = { STR("shocked") },
+	[STATUS_WET]     = { NOCAST_STR("wet")     },
+	[STATUS_BURNING] = { NOCAST_STR("burning") },
+	[STATUS_SHOCKED] = { NOCAST_STR("shocked") },
 };
 
 ActionType defaultActionTypes[] = {
-	[ACTION_IGNITE] = { STR("ignite") },
-	[ACTION_SHOCK]  = { STR("shock")  },
+	[ACTION_IGNITE] = { NOCAST_STR("ignite") },
+	[ACTION_SHOCK]  = { NOCAST_STR("shock")  },
 };
 
 Material defaultMaterials[] = {
-	[MAT_AIR]   = { STR("air"),   COLOR_HEX(0x000000), false },
-	[MAT_WATER] = { STR("water"), COLOR_HEX(0x0000ff), true },
-	[MAT_WOOD]  = { STR("wood"),  COLOR_HEX(0x804000), true },
-	[MAT_METAL] = { STR("metal"), COLOR_HEX(0xd3d3d3), true },
-	[MAT_SAND]  = { STR("sand"),  COLOR_HEX(0xc2b280), true },
+	[MAT_AIR]   = { NOCAST_STR("air"),   NOCAST_COLOR_HEX(0x000000), false },
+	[MAT_WATER] = { NOCAST_STR("water"), NOCAST_COLOR_HEX(0x0000ff), true },
+	[MAT_WOOD]  = { NOCAST_STR("wood"),  NOCAST_COLOR_HEX(0x804000), true },
+	[MAT_METAL] = { NOCAST_STR("metal"), NOCAST_COLOR_HEX(0xd3d3d3), true },
+	[MAT_SAND]  = { NOCAST_STR("sand"),  NOCAST_COLOR_HEX(0xc2b280), true },
 };
 
 MaterialTrait defaultMaterialTraits[] = {

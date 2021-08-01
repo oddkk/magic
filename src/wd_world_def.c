@@ -11,13 +11,20 @@
 
 #include <string.h>
 #include <errno.h>
+#include <stdlib.h>
 #include <limits.h>
+
+#ifdef linux
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <libgen.h>
-#include <stdlib.h>
 #include <fts.h>
+#endif
+
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 struct string
 mgcd_entry_type_name(enum mgcd_entry_type type)
@@ -88,6 +95,7 @@ mgcd_file_alloc(struct mgcd_context *ctx)
 static int
 mgcd_path_get_asset_root(struct arena *mem, struct string *out)
 {
+#ifdef linux
 	char exe_path[PATH_MAX];
 	memset(exe_path, 0, PATH_MAX * sizeof(char));
 	ssize_t err;
@@ -103,7 +111,6 @@ mgcd_path_get_asset_root(struct arena *mem, struct string *out)
 		printf("readlink: Failed.\n");
 		return -1;
 	}
-
 	char *exe_dir = dirname(exe_path);
 	size_t exe_dir_length = strlen(exe_dir);
 
@@ -119,6 +126,36 @@ mgcd_path_get_asset_root(struct arena *mem, struct string *out)
 	*out = result;
 
 	return 0;
+#endif
+
+#ifdef _WIN32
+	TCHAR exe_path[MAX_PATH];
+	DWORD result;
+	result = GetModuleFileName(NULL, exe_path, MAX_PATH);
+	if (result == MAX_PATH) {
+		printf("Failed to get the file name of the current executable: The file name was too long.\n");
+		return -1;
+	} else if (result == 0) {
+		printf("Failed to get the file name of the current executable: %i.\n",
+				GetLastError());
+		return -1;
+	}
+
+	// TODO: We should probably support wide characters.
+	PathRemoveFileSpecA(exe_path);
+
+	TCHAR asset_path[MAX_PATH];
+	PathCombineA(asset_path, exe_path, "assets");
+
+	struct string str = {0};
+	str.length = strlen(asset_path);
+	str.text = arena_alloc(mem, str.length + 1);
+	memcpy(str.text, asset_path, str.length);
+
+	*out = str;
+
+	return 0;
+#endif
 }
 
 void
@@ -366,6 +403,14 @@ mgcd_request_resource(struct mgcd_context *ctx, mgcd_job_id req_job, struct mgc_
 		NULL
 	};
 
+	int ret_err = 0;
+
+	size_t path_i = 0;
+	size_t remaining_path_i = 0;
+	mgcd_resource_id file_res = MGCD_RESOURCE_NONE;
+	mgcd_file_id fid_res = MGCD_FILE_NONE;
+
+#ifdef linux
 	FTS *ftsp;
 	ftsp = fts_open(asset_directories, FTS_PHYSICAL, NULL);
 	if (!ftsp) {
@@ -375,12 +420,6 @@ mgcd_request_resource(struct mgcd_context *ctx, mgcd_job_id req_job, struct mgc_
 
 	scope_id = ctx->root_scope;
 
-	int ret_err = 0;
-
-	size_t path_i = 0;
-	size_t remaining_path_i = 0;
-	mgcd_resource_id file_res = MGCD_RESOURCE_NONE;
-	mgcd_file_id fid_res = MGCD_FILE_NONE;
 	bool last_skipped = false;
 
 	FTSENT *f;
@@ -547,6 +586,12 @@ mgcd_request_resource(struct mgcd_context *ctx, mgcd_job_id req_job, struct mgc_
 	}
 
 	fts_close(ftsp);
+
+#endif
+
+#ifdef _WIN32
+
+#endif
 
 	if (file_res == MGCD_RESOURCE_NONE) {
 		struct arena *tmp_str_mem = ctx->tmp_mem;

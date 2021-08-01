@@ -65,6 +65,11 @@ mgc_world_src_world_def_tick(struct mgc_world_src_world_def *world)
 			return;
 		}
 
+		if (world->terrain_id < 0) {
+			printf("The terrain was not found.\n");
+			return;
+		}
+
 		// TODO: Check if the terrain definiton has changed.
 		struct mgcd_resource *res;
 		res = mgcd_resource_get(world->ctx, world->terrain_id);

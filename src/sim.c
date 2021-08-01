@@ -109,7 +109,7 @@ mgc_sim_tick(v3i sim_center, struct mgc_chunk_cache *cache, struct mgc_registry 
 			for (int x = sim_chunk_bounds.min.x; x < sim_chunk_bounds.max.x; x++) {
 				assert(sim_chunks_head < NUM_SIM_CHUNKS);
 				v3i chunk_coord = V3i(x, y, z);
-				ssize_t chunk_i = mgc_chunk_cache_find(cache, chunk_coord);
+				isize chunk_i = mgc_chunk_cache_find(cache, chunk_coord);
 
 				if (chunk_i < 0) {
 					continue;
@@ -130,7 +130,7 @@ mgc_sim_tick(v3i sim_center, struct mgc_chunk_cache *cache, struct mgc_registry 
 
 				for (size_t neighbour_i = 0; neighbour_i < sizeof(neighbourhood)/sizeof(neighbourhood[0]); neighbour_i++) {
 					v3i offset = neighbourhood[neighbour_i];
-					ssize_t chunk_i = mgc_chunk_cache_find(cache, v3i_add(chunk_coord, offset));
+					isize chunk_i = mgc_chunk_cache_find(cache, v3i_add(chunk_coord, offset));
 
 					if (chunk_i < 0) {
 						continue;

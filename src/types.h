@@ -1,6 +1,8 @@
 #ifndef MAGIC_TYPES_H
 #define MAGIC_TYPES_H
 
+#include <stdio.h>
+#include <stdlib.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
@@ -18,6 +20,9 @@ typedef int32_t int32;
 typedef int64_t int64;
 typedef float f32;
 typedef double f64;
+
+// TODO: Define from ssize_t
+typedef int64 isize;
 
 typedef uint8  u8;
 typedef uint16 u16;
@@ -162,18 +167,7 @@ mgc_hexbounds_union(struct mgc_hexbounds lhs, struct mgc_hexbounds rhs);
 struct mgc_hexbounds
 mgc_hexbounds_intersect(struct mgc_hexbounds lhs, struct mgc_hexbounds rhs);
 
-#if 0
-#define max(a, b) \
-	({ __typeof__ (a) _a = (a); \
-	   __typeof__ (b) _b = (b); \
-	   _a > _b ? _a : _b; })
-
-#define min(a, b) \
-	({ __typeof__ (a) _a = (a); \
-	   __typeof__ (b) _b = (b); \
-	   _a < _b ? _a : _b; })
-#endif
-
+#ifdef __clang__
 #define max(a, b) \
 	_Pragma("GCC diagnostic push") \
 	_Pragma("GCC diagnostic ignored \"-Wgnu-statement-expression\"") \
@@ -191,5 +185,19 @@ mgc_hexbounds_intersect(struct mgc_hexbounds lhs, struct mgc_hexbounds rhs);
 	   __typeof__ (b) _b = (b); \
 	   _a < _b ? _a : _b; }) \
 	_Pragma("GCC diagnostic pop")
+#elif _WIN32
+// min and max are implemented in stdlib.h
+#else
+#error "TODO: Implement min and max"
+// #define max(a, b) \
+// 	({ __typeof__ (a) _a = (a); \
+// 	   __typeof__ (b) _b = (b); \
+// 	   _a > _b ? _a : _b; })
+// 
+// #define min(a, b) \
+// 	({ __typeof__ (a) _a = (a); \
+// 	   __typeof__ (b) _b = (b); \
+// 	   _a < _b ? _a : _b; })
+#endif
 
 #endif

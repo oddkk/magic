@@ -11,7 +11,9 @@ struct mgc_tile {
 	u16 data;
 };
 
+#ifdef __GNUC__
 _Static_assert(sizeof(struct mgc_tile) == 4, "struct mgc_tile must be 32-bit");
+#endif
 
 static inline int
 mgc_tile_clock(struct mgc_tile t) { return !!(t.data & 0x8000); }

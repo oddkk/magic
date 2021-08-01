@@ -8,9 +8,9 @@
 #include <string.h>
 
 struct string mgcd_job_names[] = {
-	STR("FREE"),
+	NOCAST_STR("FREE"),
 
-#define JOB(name, ...) STR(#name),
+#define JOB(name, ...) NOCAST_STR(#name),
 	MGCD_JOBS
 #undef JOB
 };

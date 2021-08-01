@@ -111,9 +111,23 @@ cursor_enter_callback(GLFWwindow *win, int entered)
 	memset(&win_ctx->keys, 0, sizeof(win_ctx->keys));
 }
 
+#ifdef _WIN32
+int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR cmdLine, int showCmd)
+#else
 int main(int argc, char *argv[])
+#endif
 {
 	int err;
+
+#ifdef _WIN32
+#if 0
+	AllocConsole();
+	FILE *console_fp;
+	freopen_s(&console_fp, "CONIN$", "r", stdin);
+	freopen_s(&console_fp, "CONOUT$", "w", stdout);
+	freopen_s(&console_fp, "CONOUT$", "w", stderr);
+#endif
+#endif
 
 	if (!glfwInit()) {
 		printf("Failed to initialize glfw.\n");
@@ -362,9 +376,9 @@ int main(int argc, char *argv[])
 		);
 
 		v3 lightPos = v3_add(chunkCenter, V3(
-			cos(((float)tick / 480.0f) * 2 * M_PI) * 50.0f,
+			cos(((float)tick / 480.0f) * 2 * PI) * 50.0f,
 			8.0f,
-			sin(((float)tick / 480.0f) * 2 * M_PI) * 50.0f
+			sin(((float)tick / 480.0f) * 2 * PI) * 50.0f
 		));
 
 		m4 camera, cam_tmp;
@@ -430,4 +444,6 @@ int main(int argc, char *argv[])
 	free(chunk_cache.entries);
 	atom_table_destroy(&atom_table);
 	mgc_memory_destroy(&memory);
+
+	return 0;
 }
