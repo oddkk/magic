@@ -24,6 +24,7 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#include <strsafe.h>
 #endif
 
 struct string
@@ -346,7 +347,7 @@ mgcd_entry_type_from_ext(struct mgcd_context *ctx, struct atom *ext)
 	}
 }
 
-struct mgcd_resource_ctx {
+struct mgcd_resource_context {
 	size_t path_i;
 	size_t remaining_path_i;
 	mgcd_resource_id file_res;
@@ -358,7 +359,7 @@ struct mgcd_resource_ctx {
 };
 
 static int
-mgcd_resource_process_file(struct mgcd_context *ctx, struct mgcd_resource_ctx *res_ctx, struct atom *current_segment, size_t num_segments, struct string name_str, struct string path_str, bool is_dir)
+mgcd_resource_process_file(struct mgcd_context *ctx, struct mgcd_resource_context *res_ctx, struct atom *current_segment, size_t num_segments, struct string name_str, struct string path_str, bool is_dir)
 {
 	struct atom *name = NULL, *ext = NULL;
 
@@ -425,15 +426,37 @@ mgcd_resource_process_file(struct mgcd_context *ctx, struct mgcd_resource_ctx *r
 			if (!is_dir) {
 				enum mgcd_entry_type type = mgcd_entry_type_from_ext(ctx, ext);
 
+				struct string real_path = {0};
+
+#ifdef linux
 				char real_path_buffer[PATH_MAX+1];
 				if (!realpath(path_str.text, real_path_buffer)) {
 					perror("realpath");
 					return -1;
 				}
 
-				struct string real_path = {0};
 				real_path.text = real_path_buffer;
 				real_path.length = strlen(real_path_buffer);
+#endif
+#ifdef _WIN32
+				TCHAR real_path_buffer[MAX_PATH+1];
+				DWORD abs_path_res;
+				abs_path_res = GetFullPathName(
+					path_str.text,
+					MAX_PATH,
+					real_path_buffer,
+					NULL
+				);
+
+				if (abs_path_res == 0) {
+					printf("Failed to get the full path name of resource '%.*s'.\n", LIT(path_str));
+					return -1;
+				}
+
+				real_path.text = real_path_buffer;
+				real_path.length = abs_path_res;
+#endif
+
 
 				struct atom *file_atom;
 				file_atom = atom_create(ctx->atom_table, real_path);
@@ -477,6 +500,96 @@ mgcd_resource_process_file(struct mgcd_context *ctx, struct mgcd_resource_ctx *r
 	} else {
 		res_ctx->skip = true;
 		res_ctx->last_skipped = true;
+	}
+
+	return 0;
+}
+
+static int
+mgcd_win32_scan_directory(struct mgcd_context *ctx, struct mgcd_resource_context *res_ctx, struct mgcd_path *real_path, struct string dir_name)
+{
+	HANDLE find_handle = INVALID_HANDLE_VALUE;
+	WIN32_FIND_DATA ffd;
+
+	if (ctx->asset_root.length > (MAX_PATH - 3)) {
+		printf("Path too long.\n");
+		return -1;
+	}
+
+	// TODO: Ensure encoding is correct.
+
+	TCHAR find_pattern[MAX_PATH];
+	StringCchCopy(find_pattern, MAX_PATH, dir_name.text);
+	StringCchCat(find_pattern, MAX_PATH, TEXT("\\*"));
+
+	find_handle = FindFirstFile(find_pattern, &ffd);
+
+	int ret_err = 0;
+
+	do {
+		bool is_dir = (ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == FILE_ATTRIBUTE_DIRECTORY;
+
+		if (is_dir && (strcmp(ffd.cFileName, ".") == 0 || strcmp(ffd.cFileName, "..") == 0)) {
+			continue;
+		}
+
+
+		struct string name_str = {0};
+		name_str.text = ffd.cFileName;
+		StringCchLength(ffd.cFileName, MAX_PATH, &name_str.length);
+
+		char path_str_buffer[MAX_PATH];
+		PathCombineA(path_str_buffer, dir_name.text, ffd.cFileName);
+
+		struct string path_str = {0};
+		path_str.text = path_str_buffer;
+		StringCchLength(path_str_buffer, MAX_PATH, &path_str.length);
+
+		assert(res_ctx->path_i < real_path->num_segments);
+		struct atom *current_segment = real_path->segments[res_ctx->path_i];
+
+		res_ctx->skip = false;
+		int err;
+		err = mgcd_resource_process_file(
+				ctx,
+				res_ctx,
+				current_segment,
+				real_path->num_segments,
+				name_str,
+				path_str,
+				is_dir
+				);
+		if (err) {
+			ret_err = err;
+			continue;
+		}
+
+		if (is_dir) {
+			if (!res_ctx->skip) {
+				err = mgcd_win32_scan_directory(ctx, res_ctx, real_path, path_str);
+				if (err) {
+					ret_err = err;
+				}
+			}
+
+			if (res_ctx->last_skipped) {
+				res_ctx->last_skipped = false;
+				continue;
+			}
+			assert(res_ctx->path_i > 0);
+			res_ctx->path_i -= 1;
+		}
+
+	} while (FindNextFile(find_handle, &ffd) != 0);
+
+	DWORD ff_error = GetLastError();
+	if (ff_error != ERROR_NO_MORE_FILES) {
+		printf("Failed to find files: %i\n", ff_error);
+		return -1;
+	}
+
+	if (FindClose(find_handle) == 0) {
+		printf("Failed to close find handle: %i\n", GetLastError());
 	}
 
 	return 0;
@@ -541,7 +654,7 @@ mgcd_request_resource(struct mgcd_context *ctx, mgcd_job_id req_job, struct mgc_
 
 	int ret_err = 0;
 
-	struct mgcd_resource_ctx res_ctx = {0};
+	struct mgcd_resource_context res_ctx = {0};
 	res_ctx.scope_id = ctx->root_scope;
 	res_ctx.file_res = MGCD_RESOURCE_NONE;
 	res_ctx.fid_res = MGCD_FILE_NONE;
@@ -635,7 +748,7 @@ mgcd_request_resource(struct mgcd_context *ctx, mgcd_job_id req_job, struct mgc_
 #endif
 
 #ifdef _WIN32
-
+	ret_err = mgcd_win32_scan_directory(ctx, &res_ctx, &real_path, ctx->asset_root);
 #endif
 
 	if (res_ctx.file_res == MGCD_RESOURCE_NONE) {
