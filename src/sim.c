@@ -1,33 +1,111 @@
 #include "sim.h"
 #include "utils.h"
+#include "material.h"
 
-struct mgc_sim_chunk {
-	struct mgc_chunk *chunk;
-	struct mgc_chunk *neighbours[10];
-	struct mgc_chunk *above, *below;
-};
+#define NEIGHBOURHOOD_WIDTH 3
+#define NEIGHBOURHOOD_SIZE (NEIGHBOURHOOD_WIDTH*NEIGHBOURHOOD_WIDTH*NEIGHBOURHOOD_WIDTH)
 
-static v3i neighbourhood[10] = {
+static v3i neighbourhood[NEIGHBOURHOOD_SIZE] = {
+	{.x=-1, .y=-1, .z=-1}, {.x= 0, .y=-1, .z=-1}, {.x= 1, .y=-1, .z=-1},
+	{.x=-1, .y= 0, .z=-1}, {.x= 0, .y= 0, .z=-1}, {.x= 1, .y= 0, .z=-1},
+	{.x=-1, .y= 1, .z=-1}, {.x= 0, .y= 1, .z=-1}, {.x= 1, .y= 1, .z=-1},
+
 	{.x=-1, .y=-1, .z= 0}, {.x= 0, .y=-1, .z= 0}, {.x= 1, .y=-1, .z= 0},
-	{.x=-1, .y= 0, .z= 0},                        {.x= 1, .y= 0, .z= 0},
+	{.x=-1, .y= 0, .z= 0}, {.x= 0, .y= 0, .z= 0}, {.x= 1, .y= 0, .z= 0},
 	{.x=-1, .y= 1, .z= 0}, {.x= 0, .y= 1, .z= 0}, {.x= 1, .y= 1, .z= 0},
 
-	{.x= 0, .y= 0, .z= 1},
-	{.x= 0, .y= 0, .z=-1},
+	{.x=-1, .y=-1, .z= 1}, {.x= 0, .y=-1, .z= 1}, {.x= 1, .y=-1, .z= 1},
+	{.x=-1, .y= 0, .z= 1}, {.x= 0, .y= 0, .z= 1}, {.x= 1, .y= 0, .z= 1},
+	{.x=-1, .y= 1, .z= 1}, {.x= 0, .y= 1, .z= 1}, {.x= 1, .y= 1, .z= 1},
 };
 
-#define NUM_SIM_CHUNKS_WIDTH (((MGC_SIM_RADIUS*2+1 + CHUNK_WIDTH-1)/CHUNK_WIDTH)+1)
-#define NUM_SIM_CHUNKS_HEIGHT (((MGC_SIM_RADIUS*2+1 + CHUNK_HEIGHT-1)/CHUNK_HEIGHT)+1)
-#define NUM_SIM_CHUNKS (NUM_SIM_CHUNKS_WIDTH*NUM_SIM_CHUNKS_WIDTH*NUM_SIM_CHUNKS_HEIGHT)
-
-struct mgc_tile_neighbourhood {
-	struct mgc_tile c, nw, ne, w, e, sw, se, above, below;
+struct mgc_sim_context {
+	struct mgc_sim_chunk *chunks;
+	v3i coord;
 };
 
-struct mgc_tile
-mgc_sim_tile(struct mgc_tile_neighbourhood tiles)
+struct mgc_tile *
+mgc_sim_get_tile(struct mgc_sim_context ctx, v3i offset)
 {
-	return tiles.c;
+#if 1
+	int x = ctx.coord.x + offset.x;
+	int y = ctx.coord.y + offset.y;
+	int z = ctx.coord.z + offset.z;
+
+#if 1
+	size_t chunk_i = (NEIGHBOURHOOD_SIZE/2)
+		+ (x >> LOG_CHUNK_WIDTH)
+		+ (y >> LOG_CHUNK_WIDTH)  * 3
+		+ (z >> LOG_CHUNK_HEIGHT) * 9;
+#else
+	size_t chunk_i = (NEIGHBOURHOOD_SIZE/2)
+		+ (x / CHUNK_WIDTH)
+		+ (y / CHUNK_WIDTH)  * 3
+		+ (z / CHUNK_HEIGHT) * 9;
+#endif
+
+#if 1
+	x = (x + CHUNK_WIDTH)  & ((1<<(LOG_CHUNK_WIDTH +1))-1);
+	y = (y + CHUNK_WIDTH)  & ((1<<(LOG_CHUNK_WIDTH +1))-1);
+	z = (z + CHUNK_HEIGHT) & ((1<<(LOG_CHUNK_HEIGHT+1))-1);
+#else
+	x = (x + CHUNK_WIDTH)  % CHUNK_WIDTH;
+	y = (y + CHUNK_WIDTH)  % CHUNK_WIDTH;
+	z = (z + CHUNK_HEIGHT) % CHUNK_HEIGHT;
+#endif
+
+	size_t tile_i = x + y * CHUNK_WIDTH + z * CHUNK_LAYER_NUM_TILES;
+
+	return &ctx.chunks->neighbours[chunk_i].tiles[tile_i];
+#else
+	v3i coord = v3i_add(ctx.coord, offset);
+	// Chunk id 13 is the center chunk.
+	int chunk_id = 13;
+
+	if (coord.x <  0)           chunk_id -= 1;
+	if (coord.x >= CHUNK_WIDTH) chunk_id += 1;
+
+	if (coord.y <  0)           chunk_id -= CHUNK_WIDTH;
+	if (coord.y >= CHUNK_WIDTH) chunk_id += CHUNK_WIDTH;
+
+	if (coord.z <  0)           chunk_id -= CHUNK_LAYER_NUM_TILES;
+	if (coord.z >= CHUNK_WIDTH) chunk_id += CHUNK_LAYER_NUM_TILES;
+
+	coord.x = (coord.x + CHUNK_WIDTH)  % CHUNK_WIDTH;
+	coord.y = (coord.y + CHUNK_WIDTH)  % CHUNK_WIDTH;
+	coord.z = (coord.z + CHUNK_HEIGHT) % CHUNK_HEIGHT;
+#if 0
+	assert(
+		coord.x >= 0 && coord.x < CHUNK_WIDTH &&
+		coord.y >= 0 && coord.y < CHUNK_WIDTH &&
+		coord.z >= 0 && coord.z < CHUNK_HEIGHT
+	);
+	assert(
+		chunk_id >= 0 &&
+		chunk_id < (sizeof(ctx.chunks->neighbours) / sizeof(ctx.chunks->neighbours[0]))
+	);
+#endif
+
+	size_t tile_i = mgc_chunk_coord_to_index(coord);
+
+	return &ctx.chunks->neighbours[chunk_id].tiles[tile_i];
+#endif
+}
+
+void
+mgc_sim_tile(struct mgc_sim_context ctx)
+{
+	struct mgc_tile *tile = mgc_sim_get_tile(ctx, V3i(0, 0, 0));
+	struct mgc_tile *below = mgc_sim_get_tile(ctx, V3i(0, 0, -1));
+
+	// if (mgc_tile_clock(tile)) {
+	// }
+
+	if (tile->material == MAT_SAND && below->material == MAT_AIR) {
+		struct mgc_tile tmp = *below;
+		*below = *tile;
+		*tile = tmp;
+	}
 }
 
 void
@@ -37,50 +115,21 @@ mgc_sim_update_tiles(struct mgc_sim_chunk *chunk, size_t start_z, size_t num_lay
 	size_t end_i = (start_z+num_layers)*CHUNK_LAYER_NUM_TILES;
 	assert(end_i <= CHUNK_NUM_TILES);
 
-	// Unpack the neighbourhood
-	struct mgc_chunk *center = chunk->chunk;
-	struct mgc_chunk *north_west = chunk->neighbours[0];
-	struct mgc_chunk *north      = chunk->neighbours[1];
-	struct mgc_chunk *north_east = chunk->neighbours[2];
-	struct mgc_chunk *west       = chunk->neighbours[3];
-	struct mgc_chunk *east       = chunk->neighbours[4];
-	struct mgc_chunk *south_west = chunk->neighbours[5];
-	struct mgc_chunk *south      = chunk->neighbours[6];
-	struct mgc_chunk *south_east = chunk->neighbours[7];
-	struct mgc_chunk *above      = chunk->neighbours[8];
-	struct mgc_chunk *below      = chunk->neighbours[9];
+	struct mgc_sim_context sim_ctx = {0};
+	sim_ctx.chunks = chunk;
 
 	for (size_t i = start_i; i < end_i; i++) {
-		v3i coord = mgc_chunk_index_to_coord(i);
-
-		struct mgc_tile_neighbourhood tiles = {0};
-		tiles.c = center->tiles[i];
-
-		if (coord.z == CHUNK_HEIGHT-1) {
-			if (above) {
-				tiles.above = above->tiles[i%CHUNK_LAYER_NUM_TILES];
-			}
-		} else {
-			assert(i < CHUNK_NUM_TILES - CHUNK_LAYER_NUM_TILES);
-			tiles.above = center->tiles[i+CHUNK_LAYER_NUM_TILES];
-		}
-
-		if (coord.z == 0) {
-			if (below) {
-				size_t new_i = (CHUNK_LAYER_NUM_TILES*(CHUNK_HEIGHT-1))+(i%CHUNK_LAYER_NUM_TILES);
-				tiles.below = below->tiles[new_i];
-			}
-		} else {
-			assert(i >= CHUNK_LAYER_NUM_TILES);
-			tiles.below = center->tiles[i-CHUNK_LAYER_NUM_TILES];
-		}
-
-		center->tiles[i] = mgc_sim_tile(tiles);
+		sim_ctx.coord = mgc_chunk_index_to_coord(i);
+		mgc_sim_tile(sim_ctx);
 	}
 }
 
 void
-mgc_sim_tick(v3i sim_center, struct mgc_chunk_cache *cache, struct mgc_registry *reg)
+mgc_sim_tick(
+		struct mgc_sim_buffer *buffer,
+		v3i sim_center,
+		struct mgc_chunk_cache *cache,
+		struct mgc_registry *reg)
 {
 	struct mgc_aabbi sim_bounds, skirt_bounds;
 	sim_bounds = mgc_aabbi_from_radius(sim_center, MGC_SIM_RADIUS);
@@ -100,8 +149,10 @@ mgc_sim_tick(v3i sim_center, struct mgc_chunk_cache *cache, struct mgc_registry 
 
 	mgc_chunk_cache_tick(cache);
 
-	struct mgc_sim_chunk sim_chunks[NUM_SIM_CHUNKS] = {0};
+	memset(buffer, 0, sizeof(struct mgc_sim_buffer));
+	struct mgc_sim_chunk *sim_chunks = buffer->sim_chunks;
 	size_t sim_chunks_head = 0;
+
 
 	// TODO: Using mgc_chunk_cache_find is quite expensive. Optimize.
 	for (int z = sim_chunk_bounds.min.z; z < sim_chunk_bounds.max.z; z++) {
@@ -109,24 +160,6 @@ mgc_sim_tick(v3i sim_center, struct mgc_chunk_cache *cache, struct mgc_registry 
 			for (int x = sim_chunk_bounds.min.x; x < sim_chunk_bounds.max.x; x++) {
 				assert(sim_chunks_head < NUM_SIM_CHUNKS);
 				v3i chunk_coord = V3i(x, y, z);
-				isize chunk_i = mgc_chunk_cache_find(cache, chunk_coord);
-
-				if (chunk_i < 0) {
-					continue;
-				}
-
-				struct mgc_chunk_cache_entry *chunk_entry;
-				chunk_entry = &cache->entries[chunk_i];
-
-				if (chunk_entry->state != MGC_CHUNK_CACHE_LOADED &&
-					chunk_entry->state != MGC_CHUNK_CACHE_MESHED && 
-					chunk_entry->state != MGC_CHUNK_CACHE_DIRTY) {
-					continue;
-				}
-
-				assert(chunk_entry->chunk);
-
-				sim_chunks[sim_chunks_head].chunk = chunk_entry->chunk;
 
 				for (size_t neighbour_i = 0; neighbour_i < sizeof(neighbourhood)/sizeof(neighbourhood[0]); neighbour_i++) {
 					v3i offset = neighbourhood[neighbour_i];
@@ -147,7 +180,8 @@ mgc_sim_tick(v3i sim_center, struct mgc_chunk_cache *cache, struct mgc_registry 
 
 					assert(chunk_entry->chunk);
 
-					sim_chunks[sim_chunks_head].neighbours[neighbour_i] = chunk_entry->chunk;
+					sim_chunks[sim_chunks_head].neighbours[neighbour_i] =
+						mgc_chunk_make_ref(chunk_entry->chunk);
 				}
 
 				sim_chunks_head += 1;

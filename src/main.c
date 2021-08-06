@@ -248,14 +248,7 @@ int main(int argc, char *argv[])
 
 	int tick = 0;
 
-	int w = 2;
-	for (int z = -w; z <= w; z++) {
-		for (int y = -w; y <= w; y++) {
-			for (int x = -w; x <= w; x++) {
-				mgc_chunk_cache_request(&chunk_cache, V3i(x, y, z));
-			}
-		}
-	}
+	struct mgc_sim_buffer *sim_buffer = calloc(sizeof(struct mgc_sim_buffer), 1);
 
 	struct mgc_chunk_render_entry *render_queue;
 	size_t render_queue_cap = 1024;
@@ -346,7 +339,7 @@ int main(int argc, char *argv[])
 		}
 
 		v3i sim_center = V3i(0, 0, 0);
-		mgc_sim_tick(sim_center, &chunk_cache, &reg);
+		mgc_sim_tick(sim_buffer, sim_center, &chunk_cache, &reg);
 
 		size_t render_queue_length = 0;
 		mgc_chunk_cache_make_render_queue(

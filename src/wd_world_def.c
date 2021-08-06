@@ -505,6 +505,7 @@ mgcd_resource_process_file(struct mgcd_context *ctx, struct mgcd_resource_contex
 	return 0;
 }
 
+#ifdef _WIN32
 static int
 mgcd_win32_scan_directory(struct mgcd_context *ctx, struct mgcd_resource_context *res_ctx, struct mgcd_path *real_path, struct string dir_name)
 {
@@ -594,6 +595,7 @@ mgcd_win32_scan_directory(struct mgcd_context *ctx, struct mgcd_resource_context
 
 	return 0;
 }
+#endif
 
 mgcd_resource_id
 mgcd_request_resource(struct mgcd_context *ctx, mgcd_job_id req_job, struct mgc_location req_loc,

@@ -1,8 +1,23 @@
 #include "chunk.h"
 #include "utils.h"
 
+struct mgc_chunk_ref
+mgc_chunk_make_ref(struct mgc_chunk *chunk)
+{
+	struct mgc_chunk_ref result = {0};
+	result.location = chunk->location;
+	result.tiles = chunk->tiles;
+	return result;
+}
+
 size_t
 chunkCoordToIndex(v3i coord)
+{
+	return mgc_chunk_coord_to_index(coord);
+}
+
+size_t
+mgc_chunk_coord_to_index(v3i coord)
 {
 	return coord.z * CHUNK_LAYER_NUM_TILES
 		+  coord.y * CHUNK_WIDTH

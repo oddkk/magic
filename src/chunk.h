@@ -39,8 +39,19 @@ struct mgc_chunk {
 	struct mgc_tile tiles[CHUNK_NUM_TILES];
 };
 
+struct mgc_chunk_ref {
+	v3i location;
+	struct mgc_tile *tiles;
+};
+
+struct mgc_chunk_ref
+mgc_chunk_make_ref(struct mgc_chunk *);
+
 size_t
 chunkCoordToIndex(v3i coord);
+
+size_t
+mgc_chunk_coord_to_index(v3i coord);
 
 v3i
 mgc_chunk_index_to_coord(size_t i);
