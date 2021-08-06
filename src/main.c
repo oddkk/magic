@@ -338,8 +338,10 @@ int main(int argc, char *argv[])
 			c.position = v3_add(c.position, move_final);
 		}
 
-		v3i sim_center = V3i(0, 0, 0);
-		mgc_sim_tick(sim_buffer, sim_center, &chunk_cache, &reg);
+		if (tick % 30 == 0) {
+			v3i sim_center = V3i(0, 0, 0);
+			mgc_sim_tick(sim_buffer, sim_center, &chunk_cache, &reg);
+		}
 
 		size_t render_queue_length = 0;
 		mgc_chunk_cache_make_render_queue(

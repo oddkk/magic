@@ -18,8 +18,9 @@
 
 add /mat/wood {
 	hexagon (0, 0, 0) 50 10;
+	hexagon (0, 0, 10) 10 1;
 };
 
-add /mat/sand {
+add /mat/water {
 	hexagon (20, 20, 20) 0 10;
 };

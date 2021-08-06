@@ -19,6 +19,6 @@ set SRC=%SRC% "..\vendor\glfw\src\context.c" "..\vendor\glfw\src\init.c" "..\ven
 set FLAGS=%FLAGS% /I ..\vendor\glfw\include\ /D_GLFW_WIN32=1 gdi32.lib user32.lib kernel32.lib shell32.lib shlwapi.lib
 
 mkdir .\obj\
-cl /Zi /Fe"..\magic.exe" %FLAGS% %SRC%
+cl /O2 /Zi /Fe"..\magic.exe" %FLAGS% %SRC%
 
 popd

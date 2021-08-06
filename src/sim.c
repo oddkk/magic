@@ -24,6 +24,7 @@ struct mgc_sim_context {
 	v3i coord;
 };
 
+// This routine requires the offset to be constrained to +-(32,32,32).
 struct mgc_tile *
 mgc_sim_get_tile(struct mgc_sim_context ctx, v3i offset)
 {
@@ -33,10 +34,10 @@ mgc_sim_get_tile(struct mgc_sim_context ctx, v3i offset)
 	int z = ctx.coord.z + offset.z;
 
 #if 1
-	size_t chunk_i = (NEIGHBOURHOOD_SIZE/2)
-		+ (x >> LOG_CHUNK_WIDTH)
-		+ (y >> LOG_CHUNK_WIDTH)  * 3
-		+ (z >> LOG_CHUNK_HEIGHT) * 9;
+	size_t chunk_i = 0 // (NEIGHBOURHOOD_SIZE/2)
+		+ ((x + CHUNK_WIDTH)  >> LOG_CHUNK_WIDTH)
+		+ ((y + CHUNK_WIDTH)  >> LOG_CHUNK_WIDTH)  * 3
+		+ ((z + CHUNK_HEIGHT) >> LOG_CHUNK_HEIGHT) * 9;
 #else
 	size_t chunk_i = (NEIGHBOURHOOD_SIZE/2)
 		+ (x / CHUNK_WIDTH)
@@ -45,16 +46,16 @@ mgc_sim_get_tile(struct mgc_sim_context ctx, v3i offset)
 #endif
 
 #if 1
-	x = (x + CHUNK_WIDTH)  & ((1<<(LOG_CHUNK_WIDTH +1))-1);
-	y = (y + CHUNK_WIDTH)  & ((1<<(LOG_CHUNK_WIDTH +1))-1);
-	z = (z + CHUNK_HEIGHT) & ((1<<(LOG_CHUNK_HEIGHT+1))-1);
+	x = x & ((1<<(LOG_CHUNK_WIDTH)) -1);
+	y = y & ((1<<(LOG_CHUNK_WIDTH)) -1);
+	z = z & ((1<<(LOG_CHUNK_HEIGHT))-1);
 #else
 	x = (x + CHUNK_WIDTH)  % CHUNK_WIDTH;
 	y = (y + CHUNK_WIDTH)  % CHUNK_WIDTH;
 	z = (z + CHUNK_HEIGHT) % CHUNK_HEIGHT;
 #endif
 
-	size_t tile_i = x + y * CHUNK_WIDTH + z * CHUNK_LAYER_NUM_TILES;
+	size_t tile_i = x | y << LOG_CHUNK_WIDTH | z << (LOG_CHUNK_WIDTH*2);
 
 	return &ctx.chunks->neighbours[chunk_i].tiles[tile_i];
 #else
@@ -92,19 +93,43 @@ mgc_sim_get_tile(struct mgc_sim_context ctx, v3i offset)
 #endif
 }
 
+static inline void
+mgc_tile_swap(struct mgc_tile *t1, struct mgc_tile *t2)
+{
+	struct mgc_tile tmp = *t1;
+	*t1 = *t2;
+	*t2 = tmp;
+}
+
 void
 mgc_sim_tile(struct mgc_sim_context ctx)
 {
 	struct mgc_tile *tile = mgc_sim_get_tile(ctx, V3i(0, 0, 0));
 	struct mgc_tile *below = mgc_sim_get_tile(ctx, V3i(0, 0, -1));
 
-	// if (mgc_tile_clock(tile)) {
-	// }
+	if (tile->material == MAT_SAND) {
+		if (below->material == MAT_AIR) {
+			mgc_tile_swap(tile, below);
+			return;
+		}
+	}
 
-	if (tile->material == MAT_SAND && below->material == MAT_AIR) {
-		struct mgc_tile tmp = *below;
-		*below = *tile;
-		*tile = tmp;
+	if (tile->material == MAT_WATER) {
+		if (below->material == MAT_AIR) {
+			mgc_tile_swap(tile, below);
+			return;
+		}
+
+		for (int y = -1; y <= 1; y++) {
+			for (int x = -1; x <= 1; x++) {
+				if (y == x) continue;
+				struct mgc_tile *other = mgc_sim_get_tile(ctx, V3i(x, y, 0));
+
+				if (other->material == MAT_AIR) {
+					*other = *tile;
+				}
+			}
+		}
 	}
 }
 

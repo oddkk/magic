@@ -153,6 +153,7 @@ mgc_chunk_cache_tick(struct mgc_chunk_cache *cache)
 
 			case MGC_CHUNK_CACHE_LOADED:
 			case MGC_CHUNK_CACHE_DIRTY:
+			case MGC_CHUNK_CACHE_MESHED:
 				{
 					mgccc_debug_trace(entry->coord, "Meshing...");
 					struct mgc_chunk_gen_mesh_result res = {0};
@@ -169,7 +170,6 @@ mgc_chunk_cache_tick(struct mgc_chunk_cache *cache)
 					// fallthrough
 				}
 
-			case MGC_CHUNK_CACHE_MESHED:
 			case MGC_CHUNK_CACHE_FAILED:
 				break;
 		}
