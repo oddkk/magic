@@ -50,20 +50,14 @@ mgc_sim_get_tile(struct mgc_sim_context ctx, v3i offset)
 void
 mgc_sim_tile(struct mgc_sim_context ctx, struct mgc_tile *tile)
 {
-// #define TILE_UPDATED(tile) ((!!((tile).data & 0x8000)) == ctx.clock)
-#define _TM_TOUCHED(m) ((m) ^ (ctx.clock ? 0 : 0x4000))
-#define _TM_CHANGED(m) ((m) ^ ((m) >> 1))
+#define _TM_TOUCHED(m) ((m >> 1) ^ (ctx.clock ? 0 : 0x4000))
 #define TILE_UPDATED(tile) \
-	((_TM_TOUCHED((tile).material) & \
-	  _TM_CHANGED((tile).material)) & 0x4000)
-// #define TILE_UPDATED(tile) \
-// 	(((tile.material ^ (ctx.clock ? 0 : 0x4000)) & \
-// 	 (tile.material ^ (tile.material >> 1))) & 0x4000)
+	(m & (_TM_TOUCHED((tile).material) & 0x4000)
 #define TILE(mat, data) ((struct mgc_tile){mat, data})
 #define TILE_SET(dst, tile_data) do { \
 	if (!TILE_UPDATED(*(dst))) { \
-		(dst)->material = ((tile_data).material); \
-		(dst)->data = (ctx.clock ? 0x8000 : 0) | ((tile_data).data & 0x7fff); \
+		(dst)->material = (ctx.material ? 0xc000 : 0x4000) | ((tile_data).material & 0x3fff); \
+		(dst)->data = ((tile_data).data); \
 	} \
 } while(0);
 #define TILE_SWAP(t1, t2) do { \
@@ -76,6 +70,7 @@ mgc_sim_tile(struct mgc_sim_context ctx, struct mgc_tile *tile)
 #define MAT(tile) (mgc_tile_material(tile))
 
 	struct mgc_tile *below = mgc_sim_get_tile(ctx, V3i(0, 0, -1));
+	struct mgc_tile *above = mgc_sim_get_tile(ctx, V3i(0, 0,  1));
 
 	switch (mgc_tile_material(*tile)) {
 		case MAT_SAND:
@@ -91,6 +86,9 @@ mgc_sim_tile(struct mgc_sim_context ctx, struct mgc_tile *tile)
 			}
 
 			if (MAT(*below) == MAT_WATER) {
+				if (MAT(*above) == MAT_AIR) {
+					TILE_SET(tile, TILE(MAT_AIR, 0));
+				}
 				return;
 			}
 
@@ -132,18 +130,9 @@ mgc_sim_update_tiles(struct mgc_sim_chunk *chunk, size_t start_z, size_t num_lay
 		struct mgc_tile *tile = mgc_sim_get_tile(sim_ctx, V3i(0, 0, 0));
 		if (!!(tile->material & 0x8000) != clock) {
 			tile->material =
-				(clock ? 0xc000 : 0x0000) |
+				(clock ? 0xc000 : 0x4000) |
 				(tile->material & 0x3fff);
 			mgc_sim_tile(sim_ctx, tile);
-			/*
-			int changed = !!((x ^ (x << 1)) & 0x8000);
-			u16 clock_part = clock ? 0x8000 : 0;
-			u16 changed_part = clock_part >> (!changed);
-			tile->material =
-				  clock_part
-				| changed_part
-				| (tile->material & 0x3fff);
-			*/
 		}
 	}
 }
