@@ -52,11 +52,11 @@ mgc_sim_tile(struct mgc_sim_context ctx, struct mgc_tile *tile)
 {
 #define _TM_TOUCHED(m) ((m >> 1) ^ (ctx.clock ? 0 : 0x4000))
 #define TILE_UPDATED(tile) \
-	(m & (_TM_TOUCHED((tile).material) & 0x4000)
+	(((tile).material) & (_TM_TOUCHED((tile).material) & 0x4000))
 #define TILE(mat, data) ((struct mgc_tile){mat, data})
 #define TILE_SET(dst, tile_data) do { \
 	if (!TILE_UPDATED(*(dst))) { \
-		(dst)->material = (ctx.material ? 0xc000 : 0x4000) | ((tile_data).material & 0x3fff); \
+		(dst)->material = (ctx.clock ? 0xc000 : 0x4000) | ((tile_data).material & 0x3fff); \
 		(dst)->data = ((tile_data).data); \
 	} \
 } while(0);
@@ -110,7 +110,6 @@ mgc_sim_tile(struct mgc_sim_context ctx, struct mgc_tile *tile)
 #undef TILE_SWAP
 #undef TILE_UPDATED
 #undef _TM_TOUCHED
-#undef _TM_CHANGED
 }
 
 void
@@ -130,7 +129,7 @@ mgc_sim_update_tiles(struct mgc_sim_chunk *chunk, size_t start_z, size_t num_lay
 		struct mgc_tile *tile = mgc_sim_get_tile(sim_ctx, V3i(0, 0, 0));
 		if (!!(tile->material & 0x8000) != clock) {
 			tile->material =
-				(clock ? 0xc000 : 0x4000) |
+				(clock ? 0x8000 : 0x0000) |
 				(tile->material & 0x3fff);
 			mgc_sim_tile(sim_ctx, tile);
 		}
