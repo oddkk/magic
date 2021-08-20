@@ -68,17 +68,37 @@ mgc_sim_tile(struct mgc_sim_context ctx, struct mgc_tile *tile)
 	} \
 } while(0);
 #define MAT(tile) (mgc_tile_material(tile))
+#define DATA(tile) ((tile).data)
 
 	struct mgc_tile *below = mgc_sim_get_tile(ctx, V3i(0, 0, -1));
 	struct mgc_tile *above = mgc_sim_get_tile(ctx, V3i(0, 0,  1));
 
 	switch (mgc_tile_material(*tile)) {
+
 		case MAT_SAND:
 			if (MAT(*below) == MAT_AIR) {
+				tile->data = 1;
 				TILE_SWAP(tile, below);
 				return;
 			}
+
+			if (tile->data == 1) {
+				for (int y = -1; y <= 1; y++) {
+					for (int x = -1; x <= 1; x++) {
+						if (y == x) continue;
+						struct mgc_tile *other = mgc_sim_get_tile(ctx, V3i(x, y, -1));
+
+						if (MAT(*other) == MAT_AIR) {
+							TILE_SWAP(other, tile);
+							return;
+						}
+					}
+				}
+			}
+
+			tile->data = 0;
 			break;
+
 		case MAT_WATER:
 			if (MAT(*below) == MAT_AIR) {
 				TILE_SWAP(tile, below);
@@ -103,6 +123,7 @@ mgc_sim_tile(struct mgc_sim_context ctx, struct mgc_tile *tile)
 				}
 			}
 			break;
+
 	}
 
 #undef TILE
