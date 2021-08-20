@@ -8,6 +8,8 @@
 typedef uint16_t TraitId;
 typedef uint16_t ActionId;
 typedef uint16_t StatusId;
+
+// The top 2 bits are reserved for other purposes.
 typedef uint16_t mgc_material_id;
 
 typedef enum {

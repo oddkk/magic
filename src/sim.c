@@ -22,119 +22,101 @@ static v3i neighbourhood[NEIGHBOURHOOD_SIZE] = {
 struct mgc_sim_context {
 	struct mgc_sim_chunk *chunks;
 	v3i coord;
+	bool clock;
 };
 
 // This routine requires the offset to be constrained to +-(32,32,32).
 struct mgc_tile *
 mgc_sim_get_tile(struct mgc_sim_context ctx, v3i offset)
 {
-#if 1
 	int x = ctx.coord.x + offset.x;
 	int y = ctx.coord.y + offset.y;
 	int z = ctx.coord.z + offset.z;
 
-#if 1
-	size_t chunk_i = 0 // (NEIGHBOURHOOD_SIZE/2)
-		+ ((x + CHUNK_WIDTH)  >> LOG_CHUNK_WIDTH)
+	size_t chunk_i =
+		  ((x + CHUNK_WIDTH)  >> LOG_CHUNK_WIDTH)
 		+ ((y + CHUNK_WIDTH)  >> LOG_CHUNK_WIDTH)  * 3
 		+ ((z + CHUNK_HEIGHT) >> LOG_CHUNK_HEIGHT) * 9;
-#else
-	size_t chunk_i = (NEIGHBOURHOOD_SIZE/2)
-		+ (x / CHUNK_WIDTH)
-		+ (y / CHUNK_WIDTH)  * 3
-		+ (z / CHUNK_HEIGHT) * 9;
-#endif
 
-#if 1
 	x = x & ((1<<(LOG_CHUNK_WIDTH)) -1);
 	y = y & ((1<<(LOG_CHUNK_WIDTH)) -1);
 	z = z & ((1<<(LOG_CHUNK_HEIGHT))-1);
-#else
-	x = (x + CHUNK_WIDTH)  % CHUNK_WIDTH;
-	y = (y + CHUNK_WIDTH)  % CHUNK_WIDTH;
-	z = (z + CHUNK_HEIGHT) % CHUNK_HEIGHT;
-#endif
 
 	size_t tile_i = x | y << LOG_CHUNK_WIDTH | z << (LOG_CHUNK_WIDTH*2);
 
 	return &ctx.chunks->neighbours[chunk_i].tiles[tile_i];
-#else
-	v3i coord = v3i_add(ctx.coord, offset);
-	// Chunk id 13 is the center chunk.
-	int chunk_id = 13;
-
-	if (coord.x <  0)           chunk_id -= 1;
-	if (coord.x >= CHUNK_WIDTH) chunk_id += 1;
-
-	if (coord.y <  0)           chunk_id -= CHUNK_WIDTH;
-	if (coord.y >= CHUNK_WIDTH) chunk_id += CHUNK_WIDTH;
-
-	if (coord.z <  0)           chunk_id -= CHUNK_LAYER_NUM_TILES;
-	if (coord.z >= CHUNK_WIDTH) chunk_id += CHUNK_LAYER_NUM_TILES;
-
-	coord.x = (coord.x + CHUNK_WIDTH)  % CHUNK_WIDTH;
-	coord.y = (coord.y + CHUNK_WIDTH)  % CHUNK_WIDTH;
-	coord.z = (coord.z + CHUNK_HEIGHT) % CHUNK_HEIGHT;
-#if 0
-	assert(
-		coord.x >= 0 && coord.x < CHUNK_WIDTH &&
-		coord.y >= 0 && coord.y < CHUNK_WIDTH &&
-		coord.z >= 0 && coord.z < CHUNK_HEIGHT
-	);
-	assert(
-		chunk_id >= 0 &&
-		chunk_id < (sizeof(ctx.chunks->neighbours) / sizeof(ctx.chunks->neighbours[0]))
-	);
-#endif
-
-	size_t tile_i = mgc_chunk_coord_to_index(coord);
-
-	return &ctx.chunks->neighbours[chunk_id].tiles[tile_i];
-#endif
-}
-
-static inline void
-mgc_tile_swap(struct mgc_tile *t1, struct mgc_tile *t2)
-{
-	struct mgc_tile tmp = *t1;
-	*t1 = *t2;
-	*t2 = tmp;
 }
 
 void
-mgc_sim_tile(struct mgc_sim_context ctx)
+mgc_sim_tile(struct mgc_sim_context ctx, struct mgc_tile *tile)
 {
-	struct mgc_tile *tile = mgc_sim_get_tile(ctx, V3i(0, 0, 0));
+// #define TILE_UPDATED(tile) ((!!((tile).data & 0x8000)) == ctx.clock)
+#define _TM_TOUCHED(m) ((m) ^ (ctx.clock ? 0 : 0x4000))
+#define _TM_CHANGED(m) ((m) ^ ((m) >> 1))
+#define TILE_UPDATED(tile) \
+	((_TM_TOUCHED((tile).material) & \
+	  _TM_CHANGED((tile).material)) & 0x4000)
+// #define TILE_UPDATED(tile) \
+// 	(((tile.material ^ (ctx.clock ? 0 : 0x4000)) & \
+// 	 (tile.material ^ (tile.material >> 1))) & 0x4000)
+#define TILE(mat, data) ((struct mgc_tile){mat, data})
+#define TILE_SET(dst, tile_data) do { \
+	if (!TILE_UPDATED(*(dst))) { \
+		(dst)->material = ((tile_data).material); \
+		(dst)->data = (ctx.clock ? 0x8000 : 0) | ((tile_data).data & 0x7fff); \
+	} \
+} while(0);
+#define TILE_SWAP(t1, t2) do { \
+	if (!TILE_UPDATED(*(t1)) && !TILE_UPDATED(*(t2))) { \
+		struct mgc_tile tmp = *(t2); \
+		TILE_SET((t2), *(t1)); \
+		TILE_SET((t1), tmp); \
+	} \
+} while(0);
+#define MAT(tile) (mgc_tile_material(tile))
+
 	struct mgc_tile *below = mgc_sim_get_tile(ctx, V3i(0, 0, -1));
 
-	if (tile->material == MAT_SAND) {
-		if (below->material == MAT_AIR) {
-			mgc_tile_swap(tile, below);
-			return;
-		}
-	}
+	switch (mgc_tile_material(*tile)) {
+		case MAT_SAND:
+			if (MAT(*below) == MAT_AIR) {
+				TILE_SWAP(tile, below);
+				return;
+			}
+			break;
+		case MAT_WATER:
+			if (MAT(*below) == MAT_AIR) {
+				TILE_SWAP(tile, below);
+				return;
+			}
 
-	if (tile->material == MAT_WATER) {
-		if (below->material == MAT_AIR) {
-			mgc_tile_swap(tile, below);
-			return;
-		}
+			if (MAT(*below) == MAT_WATER) {
+				return;
+			}
 
-		for (int y = -1; y <= 1; y++) {
-			for (int x = -1; x <= 1; x++) {
-				if (y == x) continue;
-				struct mgc_tile *other = mgc_sim_get_tile(ctx, V3i(x, y, 0));
+			for (int y = -1; y <= 1; y++) {
+				for (int x = -1; x <= 1; x++) {
+					if (y == x) continue;
+					struct mgc_tile *other = mgc_sim_get_tile(ctx, V3i(x, y, 0));
 
-				if (other->material == MAT_AIR) {
-					*other = *tile;
+					if (MAT(*other) == MAT_AIR) {
+						TILE_SET(other, *tile);
+					}
 				}
 			}
-		}
+			break;
 	}
+
+#undef TILE
+#undef TILE_SET
+#undef TILE_SWAP
+#undef TILE_UPDATED
+#undef _TM_TOUCHED
+#undef _TM_CHANGED
 }
 
 void
-mgc_sim_update_tiles(struct mgc_sim_chunk *chunk, size_t start_z, size_t num_layers)
+mgc_sim_update_tiles(struct mgc_sim_chunk *chunk, size_t start_z, size_t num_layers, bool clock)
 {
 	size_t start_i = start_z*CHUNK_LAYER_NUM_TILES;
 	size_t end_i = (start_z+num_layers)*CHUNK_LAYER_NUM_TILES;
@@ -142,10 +124,27 @@ mgc_sim_update_tiles(struct mgc_sim_chunk *chunk, size_t start_z, size_t num_lay
 
 	struct mgc_sim_context sim_ctx = {0};
 	sim_ctx.chunks = chunk;
+	sim_ctx.clock = clock;
 
 	for (size_t i = start_i; i < end_i; i++) {
 		sim_ctx.coord = mgc_chunk_index_to_coord(i);
-		mgc_sim_tile(sim_ctx);
+
+		struct mgc_tile *tile = mgc_sim_get_tile(sim_ctx, V3i(0, 0, 0));
+		if (!!(tile->material & 0x8000) != clock) {
+			tile->material =
+				(clock ? 0xc000 : 0x0000) |
+				(tile->material & 0x3fff);
+			mgc_sim_tile(sim_ctx, tile);
+			/*
+			int changed = !!((x ^ (x << 1)) & 0x8000);
+			u16 clock_part = clock ? 0x8000 : 0;
+			u16 changed_part = clock_part >> (!changed);
+			tile->material =
+				  clock_part
+				| changed_part
+				| (tile->material & 0x3fff);
+			*/
+		}
 	}
 }
 
@@ -154,7 +153,8 @@ mgc_sim_tick(
 		struct mgc_sim_buffer *buffer,
 		v3i sim_center,
 		struct mgc_chunk_cache *cache,
-		struct mgc_registry *reg)
+		struct mgc_registry *reg,
+		u64 sim_tick)
 {
 	struct mgc_aabbi sim_bounds, skirt_bounds;
 	sim_bounds = mgc_aabbi_from_radius(sim_center, MGC_SIM_RADIUS);
@@ -219,6 +219,8 @@ mgc_sim_tick(
 	// that are not adjacent to any other layer that is currently being
 	// updated.
 
+	bool clock = (sim_tick % 2) == 1;
+
 	// Update said chunks
 	for (size_t chunk_i = 0; chunk_i < sim_chunks_head; chunk_i++) {
 		struct mgc_sim_chunk *chunk;
@@ -228,7 +230,8 @@ mgc_sim_tick(
 			mgc_sim_update_tiles(
 				chunk,
 				batch*SIM_CHUNK_BATCH_SIZE_LAYERS,
-				SIM_CHUNK_BATCH_SIZE_LAYERS
+				SIM_CHUNK_BATCH_SIZE_LAYERS,
+				clock
 			);
 		}
 	}

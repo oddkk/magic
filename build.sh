@@ -54,4 +54,4 @@ fi
 # FLAGS="$FLAGS -fsanitize=address -fno-omit-frame-pointer"
 
 echo "Compiling"
-$CC -g -std=gnu11 -O0 -Wall -pedantic -lm -ldl -pthread $FLAGS ${SRC[*]} -o magic || exit
+$CC -g -std=gnu11 -O2 -Wall -pedantic -lm -ldl -pthread $FLAGS ${SRC[*]} -o magic || exit

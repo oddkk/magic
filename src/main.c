@@ -247,6 +247,7 @@ int main(int argc, char *argv[])
 	glEnable(GL_DEPTH_TEST);
 
 	int tick = 0;
+	u64 sim_tick = 0;
 
 	struct mgc_sim_buffer *sim_buffer = calloc(sizeof(struct mgc_sim_buffer), 1);
 
@@ -340,7 +341,8 @@ int main(int argc, char *argv[])
 
 		if (tick % 30 == 0) {
 			v3i sim_center = V3i(0, 0, 0);
-			mgc_sim_tick(sim_buffer, sim_center, &chunk_cache, &reg);
+			sim_tick += 1;
+			mgc_sim_tick(sim_buffer, sim_center, &chunk_cache, &reg, sim_tick);
 		}
 
 		size_t render_queue_length = 0;

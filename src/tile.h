@@ -5,9 +5,9 @@
 #include "material.h"
 
 struct mgc_tile {
+	// bit 0-13: material id
+	// bit 14: clock
 	u16 material;
-	// bit 0-14: material data
-	// bit 15: clock flag
 	u16 data;
 };
 
@@ -16,8 +16,8 @@ _Static_assert(sizeof(struct mgc_tile) == 4, "struct mgc_tile must be 32-bit");
 #endif
 
 static inline int
-mgc_tile_clock(struct mgc_tile t) { return !!(t.data & 0x8000); }
+mgc_tile_material(struct mgc_tile t) { return t.material & 0x3fff; }
 static inline u16
-mgc_tile_data(struct mgc_tile t) { return t.data & 0x7fff; }
+mgc_tile_data(struct mgc_tile t) { return t.data; }
 
 #endif

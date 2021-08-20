@@ -59,6 +59,7 @@ mgc_material_table_init(struct mgc_material_table *mats)
 Material *
 mgc_mat_get(struct mgc_material_table *mats, mgc_material_id id)
 {
+	id &= 0x3fff;
 	assert(id < mats->num_materials);
 	return &mats->materials[id];
 }
