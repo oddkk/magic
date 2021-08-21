@@ -4,6 +4,8 @@
 #include <GLFW/glfw3.h>
 #include <signal.h>
 
+#include "profile.h"
+
 #include "hexGrid.h"
 #include "render.h"
 #include "chunk_cache.h"
@@ -432,6 +434,9 @@ int main(int argc, char *argv[])
 		}
 
 		glfwSwapBuffers(win);
+
+		TracyCFrameMark;
+
 		glfwPollEvents();
 	}
 

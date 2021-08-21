@@ -20,6 +20,8 @@
 #include <windows.h>
 #endif
 
+#include "profile.h"
+
 static struct mgc_memory_page
 mgc_memory_alloc_page(struct mgc_memory *mem, size_t hint_size)
 {

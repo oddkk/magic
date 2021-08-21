@@ -1,8 +1,12 @@
 #!/bin/bash
 
 CC=${CC:-clang}
+CXX=${CC:-clang++}
 PLATFORM=linux-x11
 USE_LOCAL_GLFW=false
+PROFILE=false
+
+mkdir -p build/
 
 SRC=$(find src/ -name "*.c")
 FLAGS=""
@@ -14,6 +18,19 @@ FLAGS+=" -Ivendor/glad/include"
 # mathc
 SRC+=" $(find vendor/mathc/ -name "*.c")"
 FLAGS+=" -Ivendor/mathc"
+
+# tracy
+FLAGS+=" -Ivendor/tracy"
+if [[ $PROFILE = true ]]; then
+	FLAGS+=" -lstdc++ -DTRACY_ENABLE"
+	TRACY_CLIENT_CPP=vendor/tracy/TracyClient.cpp
+	TRACY_CLIENT_OUT=build/tracy.o
+	if [[ $TRACY_CLIENT_CPP -nt build/tracy.o ]]; then
+		echo "Compiling tracy client"
+		$CXX -c -std=c++11 -O2 -DTRACY_ENABLE $TRACY_CLIENT_CPP -o $TRACY_CLIENT_OUT
+	fi
+	SRC+=" $TRACY_CLIENT_OUT"
+fi
 
 # glfw
 if [[ $USE_LOCAL_GLFW = true ]]; then

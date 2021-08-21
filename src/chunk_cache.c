@@ -8,6 +8,8 @@
 #include <string.h>
 #include <stdarg.h>
 
+#include "profile.h"
+
 #if MGCD_DEBUG_CHUNK_CACHE
 static void
 mgccc_debug_trace(v3i coord, const char *fmt, ...)
@@ -122,6 +124,8 @@ mgc_chunk_cache_invalidate(struct mgc_chunk_cache *cache, v3i coord)
 void
 mgc_chunk_cache_tick(struct mgc_chunk_cache *cache)
 {
+	TracyCZone(trace, true);
+
 	mgc_world_tick(cache->world);
 
 	for (size_t entry_i = 0; entry_i < cache->head; entry_i++) {
@@ -174,6 +178,8 @@ mgc_chunk_cache_tick(struct mgc_chunk_cache *cache)
 				break;
 		}
 	}
+
+	TracyCZoneEnd(trace);
 }
 
 void
@@ -183,6 +189,8 @@ mgc_chunk_cache_make_render_queue(
 		struct mgc_chunk_render_entry *queue,
 		size_t *queue_head)
 {
+	TracyCZone(trace, true);
+
 	for (size_t i = 0; i < cache->head; i++) {
 		assert(*queue_head < queue_cap);
 
@@ -216,4 +224,6 @@ mgc_chunk_cache_make_render_queue(
 			}
 		}
 	}
+
+	TracyCZoneEnd(trace);
 }

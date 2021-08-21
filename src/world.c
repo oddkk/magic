@@ -1,4 +1,5 @@
 #include "world.h"
+#include "profile.h"
 
 void
 mgc_world_init_world_def(struct mgc_world *world, struct mgc_world_init_context *init_ctx)
@@ -15,30 +16,45 @@ mgc_world_init_precomputed(struct mgc_world *world, struct mgc_world_init_contex
 int
 mgc_world_load_chunk(struct mgc_world *world, struct mgc_chunk *chunk, v3i coord)
 {
+	TracyCZone(trace, true);
+
+	int err = -1;
+
 	switch (world->src) {
 		case MGC_WORLD_SRC_WORLD_DEF:
-			return mgc_world_src_world_def_load_chunk(&world->world_def, chunk, coord);
+			err = mgc_world_src_world_def_load_chunk(&world->world_def, chunk, coord);
+			break;
 
 		case MGC_WORLD_SRC_PRECOMPUTED:
-			return mgc_world_src_precomputed_load_chunk(&world->precomputed, chunk, coord);
+			err = mgc_world_src_precomputed_load_chunk(&world->precomputed, chunk, coord);
+			break;
+
+		default:
+			panic("Invalid world source.");
+			break;
 	}
 
-	panic("Invalid world source.");
-	return -1;
+	TracyCZoneEnd(trace);
+
+	return err;
 }
 
 void
 mgc_world_tick(struct mgc_world *world)
 {
+	TracyCZone(trace, true);
 	switch (world->src) {
 		case MGC_WORLD_SRC_WORLD_DEF:
 			mgc_world_src_world_def_tick(&world->world_def);
-			return;
+			break;
 
 		case MGC_WORLD_SRC_PRECOMPUTED:
 			mgc_world_src_precomputed_tick(&world->precomputed);
-			return;
+			break;
+		default:
+			panic("Invalid world source.");
+			break;
 	}
 
-	panic("Invalid world source.");
+	TracyCZoneEnd(trace);
 }

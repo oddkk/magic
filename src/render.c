@@ -5,6 +5,8 @@
 #include "intdef.h"
 #include "utils.h"
 
+#include "profile.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -288,6 +290,8 @@ count_set_bits_u8(u8 v)
 struct mgc_chunk_gen_mesh_result
 chunk_gen_mesh(struct chunk_gen_mesh_buffer *buffer, struct mgc_material_table *materials, struct mgc_chunk *cnk)
 {
+	TracyCZone(trace, true);
+
 	memset(buffer, 0, sizeof(struct chunk_gen_mesh_buffer));
 
 	struct layer_neighbours *neighbourMasks = buffer->neighbourMasks;
@@ -579,5 +583,6 @@ chunk_gen_mesh(struct chunk_gen_mesh_buffer *buffer, struct mgc_material_table *
 		}
 	}
 
+	TracyCZoneEnd(trace);
 	return result;
 }

@@ -5,3 +5,6 @@ magic.pdb
 /build/
 *~
 *.swp
+/tracy
+vendor/tracy/profiler/build/unix/obj
+vendor/tracy/profiler/build/unix/Tracy-release

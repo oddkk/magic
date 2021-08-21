@@ -2,6 +2,8 @@
 #include "utils.h"
 #include "material.h"
 
+#include "profile.h"
+
 #define NEIGHBOURHOOD_WIDTH 3
 #define NEIGHBOURHOOD_SIZE (NEIGHBOURHOOD_WIDTH*NEIGHBOURHOOD_WIDTH*NEIGHBOURHOOD_WIDTH)
 
@@ -165,6 +167,8 @@ mgc_sim_tick(
 		struct mgc_registry *reg,
 		u64 sim_tick)
 {
+	TracyCZone(trace, true);
+
 	struct mgc_aabbi sim_bounds, skirt_bounds;
 	sim_bounds = mgc_aabbi_from_radius(sim_center, MGC_SIM_RADIUS);
 	skirt_bounds = mgc_aabbi_from_radius(sim_center, MGC_SIM_RADIUS+MGC_SIM_SKIRT_RADIUS);
@@ -188,6 +192,7 @@ mgc_sim_tick(
 	size_t sim_chunks_head = 0;
 
 
+	TracyCZoneN(trace_find_chunks, "find chunks to simulate", true);
 	// TODO: Using mgc_chunk_cache_find is quite expensive. Optimize.
 	for (int z = sim_chunk_bounds.min.z; z < sim_chunk_bounds.max.z; z++) {
 		for (int y = sim_chunk_bounds.min.y; y < sim_chunk_bounds.max.y; y++) {
@@ -222,6 +227,7 @@ mgc_sim_tick(
 			}
 		}
 	}
+	TracyCZoneEnd(trace_find_chunks);
 
 	// TODO: Paralellize by splitting the chunk into layers. We could update
 	// multiple chunks at the same time by only updating alternating layers
@@ -230,6 +236,7 @@ mgc_sim_tick(
 
 	bool clock = (sim_tick % 2) == 1;
 
+	TracyCZoneN(trace_sim, "simulate chunks", true);
 	// Update said chunks
 	for (size_t chunk_i = 0; chunk_i < sim_chunks_head; chunk_i++) {
 		struct mgc_sim_chunk *chunk;
@@ -244,4 +251,7 @@ mgc_sim_tick(
 			);
 		}
 	}
+	TracyCZoneEnd(trace_sim);
+
+	TracyCZoneEnd(trace);
 }
