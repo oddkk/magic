@@ -26,7 +26,7 @@ struct mgc_chunk_cache_entry {
 	v3i coord;
 	struct mgc_chunk *chunk;
 	struct mgc_mesh mesh[RENDER_CHUNKS_PER_CHUNK];
-	// u64 dirty_mask[(RENDER_CHUNKS_PER_CHUNK+MGC_DIRTY_MASK_BIT_PER_UNIT-1) / MGC_DIRTY_MASK_BIT_PER_UNIT];
+	u64 dirty_mask[(RENDER_CHUNKS_PER_CHUNK+MGC_DIRTY_MASK_BIT_PER_UNIT-1) / MGC_DIRTY_MASK_BIT_PER_UNIT];
 };
 
 struct chunk_gen_mesh_buffer;
@@ -67,6 +67,9 @@ mgc_chunk_cache_invalidate(struct mgc_chunk_cache *, v3i coord);
 
 void
 mgc_chunk_cache_tick(struct mgc_chunk_cache *cache);
+
+void
+mgc_chunk_cache_render_tick(struct mgc_chunk_cache *cache);
 
 isize
 mgc_chunk_cache_find(struct mgc_chunk_cache *cache, v3i coord);

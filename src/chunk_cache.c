@@ -153,7 +153,34 @@ mgc_chunk_cache_tick(struct mgc_chunk_cache *cache)
 				}
 				entry->state = MGC_CHUNK_CACHE_LOADED;
 				mgccc_debug_trace(entry->coord, "Loading OK");
-				// fallthrough
+				break;
+
+			case MGC_CHUNK_CACHE_LOADED:
+			case MGC_CHUNK_CACHE_DIRTY:
+			case MGC_CHUNK_CACHE_MESHED:
+				break;
+
+			case MGC_CHUNK_CACHE_FAILED:
+				break;
+		}
+	}
+
+	TracyCZoneEnd(trace);
+}
+
+void
+mgc_chunk_cache_render_tick(struct mgc_chunk_cache *cache)
+{
+	TracyCZone(trace, true);
+
+	for (size_t entry_i = 0; entry_i < cache->head; entry_i++) {
+		struct mgc_chunk_cache_entry *entry = &cache->entries[entry_i];
+
+		switch (entry->state) {
+			case MGC_CHUNK_CACHE_UNUSED:
+			case MGC_CHUNK_CACHE_UNLOADED:
+			case MGC_CHUNK_CACHE_FAILED:
+				break;
 
 			case MGC_CHUNK_CACHE_LOADED:
 			case MGC_CHUNK_CACHE_DIRTY:
@@ -173,8 +200,6 @@ mgc_chunk_cache_tick(struct mgc_chunk_cache *cache)
 					mgccc_debug_trace(entry->coord, "Meshing OK");
 					// fallthrough
 				}
-
-			case MGC_CHUNK_CACHE_FAILED:
 				break;
 		}
 	}

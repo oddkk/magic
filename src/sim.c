@@ -25,6 +25,7 @@ struct mgc_sim_context {
 	struct mgc_sim_chunk *chunks;
 	v3i coord;
 	bool clock;
+	bool changed;
 };
 
 // This routine requires the offset to be constrained to +-(32,32,32).
@@ -60,6 +61,7 @@ mgc_sim_tile(struct mgc_sim_context ctx, struct mgc_tile *tile)
 	if (!TILE_UPDATED(*(dst))) { \
 		(dst)->material = (ctx.clock ? 0xc000 : 0x4000) | ((tile_data).material & 0x3fff); \
 		(dst)->data = ((tile_data).data); \
+		ctx.changed = true; \
 	} \
 } while(0);
 #define TILE_SWAP(t1, t2) do { \
@@ -146,16 +148,24 @@ mgc_sim_update_tiles(struct mgc_sim_chunk *chunk, size_t start_z, size_t num_lay
 	sim_ctx.chunks = chunk;
 	sim_ctx.clock = clock;
 
-	for (size_t i = start_i; i < end_i; i++) {
-		sim_ctx.coord = mgc_chunk_index_to_coord(i);
+	assert(num_layers*RENDER_CHUNKS_PER_CHUNK_LAYER < 64);
+	u64 dirty_mask = 0;
 
-		struct mgc_tile *tile = mgc_sim_get_tile(sim_ctx, V3i(0, 0, 0));
-		if (!!(tile->material & 0x8000) != clock) {
-			tile->material =
-				(clock ? 0x8000 : 0x0000) |
-				(tile->material & 0x3fff);
-			mgc_sim_tile(sim_ctx, tile);
+	for (size_t i = start_i; i < end_i;) {
+		size_t strip_end = i + RENDER_CHUNK_WIDTH;
+		for (; i < strip_end; i++) {
+			sim_ctx.coord = mgc_chunk_index_to_coord(i);
+
+			struct mgc_tile *tile = mgc_sim_get_tile(sim_ctx, V3i(0, 0, 0));
+			if (!!(tile->material & 0x8000) != clock) {
+				tile->material =
+					(clock ? 0x8000 : 0x0000) |
+					(tile->material & 0x3fff);
+				mgc_sim_tile(sim_ctx, tile);
+			}
 		}
+
+		sim_ctx.changed = 0;
 	}
 }
 
@@ -252,6 +262,8 @@ mgc_sim_tick(
 		}
 	}
 	TracyCZoneEnd(trace_sim);
+
+	mgc_chunk_cache_render_tick(cache);
 
 	TracyCZoneEnd(trace);
 }

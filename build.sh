@@ -4,7 +4,7 @@ CC=${CC:-clang}
 CXX=${CC:-clang++}
 PLATFORM=linux-x11
 USE_LOCAL_GLFW=false
-PROFILE=false
+PROFILE=true
 
 mkdir -p build/
 
