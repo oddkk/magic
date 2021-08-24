@@ -44,6 +44,8 @@ mgc_chunk_cache_init(struct mgc_chunk_cache *cache, struct mgc_memory *memory, s
 		memory,
 		sizeof(struct mgc_chunk_pool_entry)
 	);
+
+	mgc_chunk_spatial_index_init(&cache->index, memory);
 }
 
 static struct mgc_chunk *
@@ -67,16 +69,19 @@ mgc_chunk_cache_alloc_chunk(struct mgc_chunk_cache *cache)
 isize
 mgc_chunk_cache_find(struct mgc_chunk_cache *cache, v3i coord)
 {
-	for (size_t i = 0; i < cache->head; i++) {
-		if (cache->entries[i].state != MGC_CHUNK_CACHE_UNUSED &&
-				cache->entries[i].coord.x == coord.x &&
-				cache->entries[i].coord.y == coord.y &&
-				cache->entries[i].coord.z == coord.z) {
-			return i;
-		}
+	u32 result;
+	result = mgc_chunk_spatial_index_get(&cache->index, coord);
+	if (result == MGC_CHUNK_SPATIAL_INDEX_NO_CHUNK) {
+		return -1;
 	}
 
-	return -1;
+	assert(
+		cache->entries[result].coord.x == coord.x &&
+		cache->entries[result].coord.y == coord.y &&
+		cache->entries[result].coord.z == coord.z
+	);
+
+	return result;
 }
 
 void
@@ -101,6 +106,8 @@ mgc_chunk_cache_request(struct mgc_chunk_cache *cache, v3i coord)
 
 	entry->state = MGC_CHUNK_CACHE_UNLOADED;
 	entry->coord = coord;
+
+	mgc_chunk_spatial_index_insert(&cache->index, coord, chunk_i);
 }
 
 void
@@ -251,4 +258,200 @@ mgc_chunk_cache_make_render_queue(
 	}
 
 	TracyCZoneEnd(trace);
+}
+
+static struct mgc_chunk_spatial_index_node *
+mgc_chunk_spatial_index_alloc(struct mgc_chunk_spatial_index *idx)
+{
+	if (idx->free_list) {
+		struct mgc_chunk_spatial_index_node *result = NULL;
+		result = idx->free_list;
+		idx->free_list = result->free_list_next;
+		memset(result, 0, sizeof(struct mgc_chunk_spatial_index_node));
+		return result;
+	}
+
+	size_t id;
+	id = paged_list_push(&idx->nodes);
+	return paged_list_get(&idx->nodes, id);
+}
+
+static void
+mgc_chunk_spatial_index_free(struct mgc_chunk_spatial_index *idx, struct mgc_chunk_spatial_index_node *node)
+{
+	memset(node, 0, sizeof(struct mgc_chunk_spatial_index_node));
+	node->free_list_next = idx->free_list;
+	idx->free_list = node;
+}
+
+#define COORD_OFFSET 100
+
+static inline v3u
+world_to_idx(v3i c)
+{
+	return V3u(
+		c.x + COORD_OFFSET,
+		c.y + COORD_OFFSET,
+		c.z + COORD_OFFSET
+	);
+}
+
+static inline v3i
+idx_to_world(v3u c)
+{
+	return V3i(
+		c.x - COORD_OFFSET,
+		c.y - COORD_OFFSET,
+		c.z - COORD_OFFSET
+	);
+}
+
+#undef COORD_OFFSET
+
+static inline v3u
+idx_to_level(v3u c, unsigned int level) 
+{
+	return V3u(
+		c.x >> (MGC_CHUNK_SPATIAL_INDEX_WIDTH_LOG2*level),
+		c.y >> (MGC_CHUNK_SPATIAL_INDEX_WIDTH_LOG2*level),
+		c.z >> (MGC_CHUNK_SPATIAL_INDEX_WIDTH_LOG2*level)
+	);
+}
+
+static int
+idx_to_child_id(v3u c)
+{
+	int result = 0;
+	result += (c.x % MGC_CHUNK_SPATIAL_INDEX_WIDTH);
+	result += (c.y % MGC_CHUNK_SPATIAL_INDEX_WIDTH) * MGC_CHUNK_SPATIAL_INDEX_WIDTH;
+	result += (c.z % MGC_CHUNK_SPATIAL_INDEX_WIDTH) * MGC_CHUNK_SPATIAL_INDEX_WIDTH * MGC_CHUNK_SPATIAL_INDEX_WIDTH;
+	assert(result < MGC_CHUNK_SPATIAL_INDEX_LEAFS);
+	return result;
+}
+
+void
+mgc_chunk_spatial_index_init(struct mgc_chunk_spatial_index *idx, struct mgc_memory *mem)
+{
+	memset(idx, 0, sizeof(struct mgc_chunk_spatial_index));
+	paged_list_init(&idx->nodes, mem, sizeof(struct mgc_chunk_spatial_index_node));
+}
+
+int
+mgc_chunk_spatial_index_insert(struct mgc_chunk_spatial_index *idx, v3i chunk_coord, u32 chunk_id)
+{
+	v3u chunk = world_to_idx(chunk_coord);
+
+	if (!idx->root) {
+		struct mgc_chunk_spatial_index_node *new_root;
+		new_root = mgc_chunk_spatial_index_alloc(idx);
+		new_root->level = 0;
+		new_root->coord = idx_to_level(chunk, new_root->level+1);
+
+		for (size_t i = 0; i < MGC_CHUNK_SPATIAL_INDEX_LEAFS; i++) {
+			new_root->chunks[i].index = MGC_CHUNK_SPATIAL_INDEX_NO_CHUNK;
+		}
+		idx->root = new_root;
+	}
+
+	while (!v3u_equal(idx->root->coord, idx_to_level(chunk, idx->root->level+1))) {
+		struct mgc_chunk_spatial_index_node *new_root;
+		new_root = mgc_chunk_spatial_index_alloc(idx);
+		new_root->level = idx->root->level + 1;
+		new_root->coord = idx_to_level(idx->root->coord, 1);
+		int child_id = idx_to_child_id(idx->root->coord);
+		new_root->children[child_id] = idx->root;
+		idx->root = new_root;
+	}
+
+	struct mgc_chunk_spatial_index_node *node;
+	node = idx->root;
+
+	while (node->level > 0) {
+		v3u child_coord = idx_to_level(chunk, node->level);
+		int child_id = idx_to_child_id(child_coord);
+
+		if (!node->children[child_id]) {
+			struct mgc_chunk_spatial_index_node *new_node;
+			new_node = mgc_chunk_spatial_index_alloc(idx);
+			new_node->level = node->level - 1;
+			new_node->coord = child_coord;
+			node->children[child_id] = new_node;
+
+			if (new_node->level == 0) {
+				for (size_t i = 0; i < MGC_CHUNK_SPATIAL_INDEX_LEAFS; i++) {
+					new_node->chunks[i].index = MGC_CHUNK_SPATIAL_INDEX_NO_CHUNK;
+				}
+			}
+		}
+
+		node = node->children[child_id];
+	}
+
+	assert(node && node->level == 0);
+
+	int child_id = idx_to_child_id(chunk);
+	if (node->chunks[child_id].index != MGC_CHUNK_SPATIAL_INDEX_NO_CHUNK) {
+		return -1;
+	}
+
+	node->chunks[child_id].index = chunk_id;
+	return 0;
+}
+
+int
+mgc_chunk_spatial_index_remove(struct mgc_chunk_spatial_index *idx, v3i chunk_coord)
+{
+	v3u chunk = world_to_idx(chunk_coord);
+
+	struct mgc_chunk_spatial_index_node *node;
+	node = idx->root;
+
+	while (node && node->level > 0) {
+		v3u child_coord = idx_to_level(chunk, node->level);
+		int child_id = idx_to_child_id(child_coord);
+
+		node = node->children[child_id];
+	}
+
+	if (!node || node->level != 0) {
+		return -1;
+	}
+
+	int child_id = idx_to_child_id(chunk);
+	if (node->chunks[child_id].index == MGC_CHUNK_SPATIAL_INDEX_NO_CHUNK) {
+		return -1;
+	}
+
+	node->chunks[child_id].index = MGC_CHUNK_SPATIAL_INDEX_NO_CHUNK;
+	return 0;
+}
+
+u32
+mgc_chunk_spatial_index_get(struct mgc_chunk_spatial_index *idx, v3i chunk_coord)
+{
+	v3u chunk = world_to_idx(chunk_coord);
+
+	struct mgc_chunk_spatial_index_node *node;
+	node = idx->root;
+	if (!node) {
+		return MGC_CHUNK_SPATIAL_INDEX_NO_CHUNK;
+	}
+
+	while (node && node->level > 0) {
+		v3u child_coord = idx_to_level(chunk, node->level);
+		int child_id = idx_to_child_id(child_coord);
+
+		node = node->children[child_id];
+	}
+
+	if (!node || node->level != 0) {
+		return MGC_CHUNK_SPATIAL_INDEX_NO_CHUNK;
+	}
+
+	if (!v3u_equal(node->coord, idx_to_level(chunk, 1))) {
+		return MGC_CHUNK_SPATIAL_INDEX_NO_CHUNK;
+	}
+
+	int child_id = idx_to_child_id(chunk);
+	return node->chunks[child_id].index;
 }

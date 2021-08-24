@@ -203,6 +203,15 @@ mgc_sim_tick(
 
 
 	TracyCZoneN(trace_find_chunks, "find chunks to simulate", true);
+	for (size_t i = 0; i < cache->head; i++) {
+		struct mgc_chunk_cache_entry *entry;
+		entry = &cache->entries[i];
+
+		if (entry->state == MGC_CHUNK_CACHE_MESHED ||
+			entry->state == MGC_CHUNK_CACHE_DIRTY) {
+		}
+	}
+
 	// TODO: Using mgc_chunk_cache_find is quite expensive. Optimize.
 	for (int z = sim_chunk_bounds.min.z; z < sim_chunk_bounds.max.z; z++) {
 		for (int y = sim_chunk_bounds.min.y; y < sim_chunk_bounds.max.y; y++) {

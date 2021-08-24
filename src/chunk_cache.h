@@ -37,11 +37,61 @@ struct mgc_chunk_pool_entry {
 	struct mgc_chunk chunk;
 };
 
+struct mgc_chunk_spatial_index_entry {
+	u32 index;
+};
+
+#define MGC_CHUNK_SPATIAL_INDEX_WIDTH_LOG2 (1)
+#define MGC_CHUNK_SPATIAL_INDEX_WIDTH (1 << MGC_CHUNK_SPATIAL_INDEX_WIDTH_LOG2)
+#define MGC_CHUNK_SPATIAL_INDEX_CHILDREN (MGC_CHUNK_SPATIAL_INDEX_WIDTH*MGC_CHUNK_SPATIAL_INDEX_WIDTH*MGC_CHUNK_SPATIAL_INDEX_WIDTH)
+#define MGC_CHUNK_SPATIAL_INDEX_LEAFS MGC_CHUNK_SPATIAL_INDEX_CHILDREN
+/*
+(( \
+		sizeof(struct mgc_chunk_spatial_index_node *) * \
+		MGC_CHUNK_SPATIAL_INDEX_CHILDREN) / \
+		sizeof(struct mgc_chunk_spatial_index_entry))
+		*/
+
+// The coordinate system for this index is translated to (INT_MAX, INT_MAX,
+// INT_MAX). This is to avoid having to deal with rounding negative integers
+// towards negative infinity instead of towards 0.
+struct mgc_chunk_spatial_index_node {
+	v3u coord;
+	unsigned int level;
+	// size_t num_chunks;
+	union {
+		struct mgc_chunk_spatial_index_entry chunks[MGC_CHUNK_SPATIAL_INDEX_LEAFS];
+		struct mgc_chunk_spatial_index_node *children[MGC_CHUNK_SPATIAL_INDEX_CHILDREN];
+		struct mgc_chunk_spatial_index_node *free_list_next;
+	};
+};
+
+struct mgc_chunk_spatial_index {
+	struct mgc_chunk_spatial_index_node *root;
+	struct mgc_chunk_spatial_index_node *free_list;
+	struct paged_list nodes;
+};
+
+#define MGC_CHUNK_SPATIAL_INDEX_NO_CHUNK UINT32_MAX
+
+void
+mgc_chunk_spatial_index_init(struct mgc_chunk_spatial_index *, struct mgc_memory *);
+
+int
+mgc_chunk_spatial_index_insert(struct mgc_chunk_spatial_index *, v3i coord, u32 chunk_id);
+
+int
+mgc_chunk_spatial_index_remove(struct mgc_chunk_spatial_index *, v3i coord);
+
+u32
+mgc_chunk_spatial_index_get(struct mgc_chunk_spatial_index *, v3i coord);
+
 struct mgc_chunk_cache {
-	// TODO: Spatial data structure
 	struct mgc_chunk_cache_entry *entries;
 	size_t cap_entries;
 	size_t head;
+
+	struct mgc_chunk_spatial_index index;
 
 	struct chunk_gen_mesh_buffer *gen_mesh_buffer;
 	struct mgc_material_table *mat_table;

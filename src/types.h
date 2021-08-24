@@ -79,6 +79,7 @@ typedef int64 i64;
 
 VEC_MAT_DEF(f32, f)
 VEC_MAT_DEF(i32, i)
+VEC_MAT_DEF(u32, u)
 
 #undef VEC_MAT_DEF
 
@@ -104,6 +105,9 @@ V2i(i32 x, i32 y) { return (v2i) {.x = x, .y = y}; }
 static inline v3i
 V3i(i32 x, i32 y, i32 z) { return (v3i) {.x = x, .y = y, .z = z}; }
 
+static inline v3u
+V3u(u32 x, u32 y, u32 z) { return (v3u) {.x = x, .y = y, .z = z}; }
+
 static inline v4i
 V4i(i32 x, i32 y, i32 z, i32 w) { return (v4i) {.x = x, .y = y, .z = z, .w = w}; }
 
@@ -125,6 +129,8 @@ v3i_add(v3i lhs, v3i rhs) { lhs.x += rhs.x; lhs.y += rhs.y; lhs.z += rhs.z; retu
 static inline v4i
 v4i_add(v4i lhs, v4i rhs) { lhs.x += rhs.x; lhs.y += rhs.y; lhs.z += rhs.z; lhs.w += rhs.w; return lhs; }
 
+static inline bool
+v3u_equal(v3u lhs, v3u rhs) { return lhs.x == rhs.x && lhs.y == rhs.y && lhs.z == rhs.z; }
 
 m4i *
 m4i_identity(m4i *m);
@@ -166,6 +172,17 @@ mgc_hexbounds_union(struct mgc_hexbounds lhs, struct mgc_hexbounds rhs);
 
 struct mgc_hexbounds
 mgc_hexbounds_intersect(struct mgc_hexbounds lhs, struct mgc_hexbounds rhs);
+
+static inline int
+i32_div_neginf(int x, int y)
+{
+	int q = x/y;
+	int r = x%y;
+	if ((r != 0) && ((r < 0) != (y < 0))) {
+		q--;
+	}
+	return q;
+}
 
 #ifdef __clang__
 #define max(a, b) \
