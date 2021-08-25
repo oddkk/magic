@@ -343,9 +343,15 @@ int main(int argc, char *argv[])
 
 		if (tick % 30 == 0) {
 			v3i sim_center = V3i(0, 0, 0);
+			mgc_chunk_cache_set_sim_center(&chunk_cache, sim_center);
+			mgc_chunk_cache_tick(&chunk_cache);
+
 			sim_tick += 1;
-			mgc_sim_tick(sim_buffer, sim_center, &chunk_cache, &reg, sim_tick);
+			mgc_sim_tick(sim_buffer, &chunk_cache, &reg, sim_tick);
 		}
+
+
+		mgc_chunk_cache_render_tick(&chunk_cache);
 
 		size_t render_queue_length = 0;
 		mgc_chunk_cache_make_render_queue(

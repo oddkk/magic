@@ -129,6 +129,28 @@ mgc_chunk_cache_invalidate(struct mgc_chunk_cache *cache, v3i coord)
 }
 
 void
+mgc_chunk_cache_set_sim_center(struct mgc_chunk_cache *cache, v3i sim_center)
+{
+	cache->sim_center = sim_center;
+
+	struct mgc_aabbi sim_bounds, skirt_bounds;
+	sim_bounds = mgc_aabbi_from_radius(sim_center, MGC_SIM_RADIUS);
+	skirt_bounds = mgc_aabbi_from_radius(sim_center, MGC_SIM_RADIUS+MGC_SIM_SKIRT_RADIUS);
+
+	struct mgc_aabbi load_chunk_bounds, sim_chunk_bounds;
+	load_chunk_bounds = mgc_coord_bounds_tile_to_chunk(skirt_bounds);
+	sim_chunk_bounds = mgc_coord_bounds_tile_to_chunk(sim_bounds);
+
+	for (int z = load_chunk_bounds.min.z; z < load_chunk_bounds.max.z; z++) {
+		for (int y = load_chunk_bounds.min.y; y < load_chunk_bounds.max.y; y++) {
+			for (int x = load_chunk_bounds.min.x; x < load_chunk_bounds.max.x; x++) {
+				mgc_chunk_cache_request(cache, V3i(x, y, z));
+			}
+		}
+	}
+}
+
+void
 mgc_chunk_cache_tick(struct mgc_chunk_cache *cache)
 {
 	TracyCZone(trace, true);

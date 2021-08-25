@@ -192,45 +192,20 @@ mgc_sim_update_tiles(struct mgc_sim_chunk *chunk, size_t start_z, size_t num_lay
 void
 mgc_sim_tick(
 		struct mgc_sim_buffer *buffer,
-		v3i sim_center,
 		struct mgc_chunk_cache *cache,
 		struct mgc_registry *reg,
 		u64 sim_tick)
 {
 	TracyCZone(trace, true);
 
-	struct mgc_aabbi sim_bounds, skirt_bounds;
-	sim_bounds = mgc_aabbi_from_radius(sim_center, MGC_SIM_RADIUS);
-	skirt_bounds = mgc_aabbi_from_radius(sim_center, MGC_SIM_RADIUS+MGC_SIM_SKIRT_RADIUS);
-
-	struct mgc_aabbi load_chunk_bounds, sim_chunk_bounds;
-	load_chunk_bounds = mgc_coord_bounds_tile_to_chunk(skirt_bounds);
-	sim_chunk_bounds = mgc_coord_bounds_tile_to_chunk(sim_bounds);
-
-	for (int z = load_chunk_bounds.min.z; z < load_chunk_bounds.max.z; z++) {
-		for (int y = load_chunk_bounds.min.y; y < load_chunk_bounds.max.y; y++) {
-			for (int x = load_chunk_bounds.min.x; x < load_chunk_bounds.max.x; x++) {
-				mgc_chunk_cache_request(cache, V3i(x, y, z));
-			}
-		}
-	}
-
-	mgc_chunk_cache_tick(cache);
-
 	memset(buffer, 0, sizeof(struct mgc_sim_buffer));
 	struct mgc_sim_chunk *sim_chunks = buffer->sim_chunks;
 	size_t sim_chunks_head = 0;
 
-
 	TracyCZoneN(trace_find_chunks, "find chunks to simulate", true);
-	for (size_t i = 0; i < cache->head; i++) {
-		struct mgc_chunk_cache_entry *entry;
-		entry = &cache->entries[i];
-
-		if (entry->state == MGC_CHUNK_CACHE_MESHED ||
-			entry->state == MGC_CHUNK_CACHE_DIRTY) {
-		}
-	}
+	struct mgc_aabbi sim_bounds, sim_chunk_bounds;
+	sim_bounds = mgc_aabbi_from_radius(cache->sim_center, MGC_SIM_RADIUS);
+	sim_chunk_bounds = mgc_coord_bounds_tile_to_chunk(sim_bounds);
 
 	// TODO: Using mgc_chunk_cache_find is quite expensive. Optimize.
 	for (int z = sim_chunk_bounds.min.z; z < sim_chunk_bounds.max.z; z++) {
@@ -302,8 +277,6 @@ mgc_sim_tick(
 		}
 	}
 	TracyCZoneEnd(trace_sim);
-
-	mgc_chunk_cache_render_tick(cache);
 
 	TracyCZoneEnd(trace);
 }

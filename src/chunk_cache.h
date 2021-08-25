@@ -95,6 +95,8 @@ struct mgc_chunk_cache {
 	size_t cap_entries;
 	size_t head;
 
+	v3i sim_center;
+
 	struct mgc_chunk_spatial_index index;
 
 	struct chunk_gen_mesh_buffer *gen_mesh_buffer;
@@ -127,6 +129,9 @@ mgc_chunk_cache_render_tick(struct mgc_chunk_cache *cache);
 
 isize
 mgc_chunk_cache_find(struct mgc_chunk_cache *cache, v3i coord);
+
+void
+mgc_chunk_cache_set_sim_center(struct mgc_chunk_cache *cache, v3i coord);
 
 struct mgc_chunk_render_entry {
 	struct mgc_mesh mesh;

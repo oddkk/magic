@@ -18,7 +18,6 @@ struct mgc_sim_buffer {
 void
 mgc_sim_tick(
 		struct mgc_sim_buffer *,
-		v3i sim_center,
 		struct mgc_chunk_cache *cache,
 		struct mgc_registry *reg,
 		u64 sim_tick);
