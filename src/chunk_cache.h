@@ -90,12 +90,16 @@ mgc_chunk_spatial_index_remove(struct mgc_chunk_spatial_index *, v3i coord);
 u32
 mgc_chunk_spatial_index_get(struct mgc_chunk_spatial_index *, v3i coord);
 
+#define MGC_CHUNK_CACHE_UPDATE_RENDER (0)
+#define MGC_CHUNK_CACHE_UPDATE_SIM (1)
+
 struct mgc_chunk_cache {
 	struct mgc_chunk_cache_entry *entries;
 	size_t cap_entries;
 	size_t head;
 
 	v3i sim_center;
+	volatile int update_state;
 
 	struct mgc_chunk_spatial_index index;
 

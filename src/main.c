@@ -14,6 +14,7 @@
 #include "world.h"
 #include "registry.h"
 #include "sim.h"
+#include "sim_thread.h"
 
 #include "wd_world_def.h"
 #include "wd_shape.h"
@@ -248,10 +249,13 @@ int main(int argc, char *argv[])
 
 	glEnable(GL_DEPTH_TEST);
 
-	int tick = 0;
-	u64 sim_tick = 0;
+	struct mgc_sim_thread sim_thread_info = {0};
+	mgc_sim_thread_start(&sim_thread_info, &arena, &chunk_cache, &reg);
 
-	struct mgc_sim_buffer *sim_buffer = calloc(sizeof(struct mgc_sim_buffer), 1);
+	int tick = 0;
+
+
+	// struct mgc_sim_buffer *sim_buffer = calloc(sizeof(struct mgc_sim_buffer), 1);
 
 	struct mgc_chunk_render_entry *render_queue;
 	size_t render_queue_cap = 1024;
@@ -345,9 +349,6 @@ int main(int argc, char *argv[])
 			v3i sim_center = V3i(0, 0, 0);
 			mgc_chunk_cache_set_sim_center(&chunk_cache, sim_center);
 			mgc_chunk_cache_tick(&chunk_cache);
-
-			sim_tick += 1;
-			mgc_sim_tick(sim_buffer, &chunk_cache, &reg, sim_tick);
 		}
 
 
@@ -447,6 +448,8 @@ int main(int argc, char *argv[])
 	}
 
 	signal(SIGINT, SIG_DFL);
+
+	mgc_sim_thread_stop(&sim_thread_info);
 
 	free(render_queue);
 	free(chunk_cache.entries);

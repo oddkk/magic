@@ -200,46 +200,50 @@ mgc_chunk_cache_tick(struct mgc_chunk_cache *cache)
 void
 mgc_chunk_cache_render_tick(struct mgc_chunk_cache *cache)
 {
-	TracyCZone(trace, true);
+	if (cache->update_state == MGC_CHUNK_CACHE_UPDATE_RENDER) {
+		TracyCZone(trace, true);
 
-	for (size_t entry_i = 0; entry_i < cache->head; entry_i++) {
-		struct mgc_chunk_cache_entry *entry = &cache->entries[entry_i];
+		for (size_t entry_i = 0; entry_i < cache->head; entry_i++) {
+			struct mgc_chunk_cache_entry *entry = &cache->entries[entry_i];
 
-		switch (entry->state) {
-			case MGC_CHUNK_CACHE_UNUSED:
-			case MGC_CHUNK_CACHE_UNLOADED:
-			case MGC_CHUNK_CACHE_FAILED:
-				break;
+			switch (entry->state) {
+				case MGC_CHUNK_CACHE_UNUSED:
+				case MGC_CHUNK_CACHE_UNLOADED:
+				case MGC_CHUNK_CACHE_FAILED:
+					break;
 
-			case MGC_CHUNK_CACHE_LOADED:
-			case MGC_CHUNK_CACHE_DIRTY:
-				entry->dirty_mask = UINT64_MAX;
-				// fallthrough
-			case MGC_CHUNK_CACHE_MESHED:
-				if (entry->dirty_mask) {
-					mgccc_debug_trace(entry->coord, "Meshing...");
-					struct mgc_chunk_gen_mesh_result res = {0};
-					res = chunk_gen_mesh(
-						cache->gen_mesh_buffer,
-						cache->mat_table,
-						entry->chunk,
-						entry->dirty_mask
-					);
-					entry->dirty_mask = 0;
-					for (size_t i = 0; i < RENDER_CHUNKS_PER_CHUNK; i++) {
-						if (res.set[i]) {
-							entry->mesh[i] = res.mesh[i];
-						}
-					}
-					entry->state = MGC_CHUNK_CACHE_MESHED;
-					mgccc_debug_trace(entry->coord, "Meshing OK");
+				case MGC_CHUNK_CACHE_LOADED:
+				case MGC_CHUNK_CACHE_DIRTY:
+					entry->dirty_mask = UINT64_MAX;
 					// fallthrough
-				}
-				break;
+				case MGC_CHUNK_CACHE_MESHED:
+					if (entry->dirty_mask) {
+						mgccc_debug_trace(entry->coord, "Meshing...");
+						struct mgc_chunk_gen_mesh_result res = {0};
+						res = chunk_gen_mesh(
+								cache->gen_mesh_buffer,
+								cache->mat_table,
+								entry->chunk,
+								entry->dirty_mask
+								);
+						entry->dirty_mask = 0;
+						for (size_t i = 0; i < RENDER_CHUNKS_PER_CHUNK; i++) {
+							if (res.set[i]) {
+								entry->mesh[i] = res.mesh[i];
+							}
+						}
+						entry->state = MGC_CHUNK_CACHE_MESHED;
+						mgccc_debug_trace(entry->coord, "Meshing OK");
+						// fallthrough
+					}
+					break;
+			}
 		}
-	}
 
-	TracyCZoneEnd(trace);
+		cache->update_state = MGC_CHUNK_CACHE_UPDATE_SIM;
+
+		TracyCZoneEnd(trace);
+	}
 }
 
 void
