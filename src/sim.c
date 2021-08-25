@@ -6,6 +6,7 @@
 
 #define NEIGHBOURHOOD_WIDTH 3
 #define NEIGHBOURHOOD_SIZE (NEIGHBOURHOOD_WIDTH*NEIGHBOURHOOD_WIDTH*NEIGHBOURHOOD_WIDTH)
+#define NEIGHBOURHOOD_CENTER_IDX 13
 
 static v3i neighbourhood[NEIGHBOURHOOD_SIZE] = {
 	{.x=-1, .y=-1, .z=-1}, {.x= 0, .y=-1, .z=-1}, {.x= 1, .y=-1, .z=-1},
@@ -25,7 +26,7 @@ struct mgc_sim_context {
 	struct mgc_sim_chunk *chunks;
 	v3i coord;
 	bool clock;
-	bool changed;
+	int *changed;
 };
 
 // This routine requires the offset to be constrained to +-(32,32,32).
@@ -61,7 +62,7 @@ mgc_sim_tile(struct mgc_sim_context ctx, struct mgc_tile *tile)
 	if (!TILE_UPDATED(*(dst))) { \
 		(dst)->material = (ctx.clock ? 0xc000 : 0x4000) | ((tile_data).material & 0x3fff); \
 		(dst)->data = ((tile_data).data); \
-		ctx.changed = true; \
+		*ctx.changed = 1; \
 	} \
 } while(0);
 #define TILE_SWAP(t1, t2) do { \
@@ -148,10 +149,13 @@ mgc_sim_update_tiles(struct mgc_sim_chunk *chunk, size_t start_z, size_t num_lay
 	sim_ctx.chunks = chunk;
 	sim_ctx.clock = clock;
 
-	assert(num_layers*RENDER_CHUNKS_PER_CHUNK_LAYER < 64);
+	int changed = 0;
+	sim_ctx.changed = &changed;
+
 	u64 dirty_mask = 0;
 
 	for (size_t i = start_i; i < end_i;) {
+		size_t strip_start = i;
 		size_t strip_end = i + RENDER_CHUNK_WIDTH;
 		for (; i < strip_end; i++) {
 			sim_ctx.coord = mgc_chunk_index_to_coord(i);
@@ -165,8 +169,24 @@ mgc_sim_update_tiles(struct mgc_sim_chunk *chunk, size_t start_z, size_t num_lay
 			}
 		}
 
-		sim_ctx.changed = 0;
+		u64 rchunk_idx = strip_start / RENDER_CHUNK_WIDTH;
+		u64 rchunk_x = rchunk_idx % RENDER_CHUNKS_PER_CHUNK_WIDTH;
+		u64 rchunk_y = (rchunk_idx / (RENDER_CHUNKS_PER_CHUNK_WIDTH * RENDER_CHUNK_WIDTH)) % RENDER_CHUNKS_PER_CHUNK_WIDTH;
+		u64 rchunk_z = (rchunk_idx / (RENDER_CHUNKS_PER_CHUNK_WIDTH * CHUNK_WIDTH * RENDER_CHUNK_WIDTH));
+		u64 rchunk_i = rchunk_x +
+			(rchunk_y * RENDER_CHUNKS_PER_CHUNK_WIDTH) +
+			(rchunk_z * RENDER_CHUNKS_PER_CHUNK_LAYER);
+		assert(rchunk_i < RENDER_CHUNKS_PER_CHUNK);
+
+		dirty_mask |= ((u64)changed << rchunk_i);
+		// TODO: Neighbouring chunks should potentially also be tagged as
+		// dirty, as we currently have no way of knowing when a tile outside
+		// the current chunk is changed.
+
+		changed = 0;
 	}
+
+	chunk->cache_entry->dirty_mask |= dirty_mask;
 }
 
 void
@@ -238,8 +258,19 @@ mgc_sim_tick(
 
 					assert(chunk_entry->chunk);
 
+
+					if (neighbour_i == NEIGHBOURHOOD_CENTER_IDX) {
+						sim_chunks[sim_chunks_head].cache_entry = chunk_entry;
+					}
+
 					sim_chunks[sim_chunks_head].neighbours[neighbour_i] =
 						mgc_chunk_make_ref(chunk_entry->chunk);
+				}
+
+				// The center chunk was not loaded, so don't try simulating it.
+				if (!sim_chunks[sim_chunks_head].cache_entry) {
+					memset(&sim_chunks[sim_chunks_head], 0, sizeof(struct mgc_sim_chunk));
+					continue;
 				}
 
 				sim_chunks_head += 1;

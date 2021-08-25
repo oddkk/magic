@@ -288,7 +288,7 @@ count_set_bits_u8(u8 v)
 }
 
 struct mgc_chunk_gen_mesh_result
-chunk_gen_mesh(struct chunk_gen_mesh_buffer *buffer, struct mgc_material_table *materials, struct mgc_chunk *cnk)
+chunk_gen_mesh(struct chunk_gen_mesh_buffer *buffer, struct mgc_material_table *materials, struct mgc_chunk *cnk, u64 dirty_mask)
 {
 	TracyCZone(trace, true);
 
@@ -337,6 +337,11 @@ chunk_gen_mesh(struct chunk_gen_mesh_buffer *buffer, struct mgc_material_table *
 	struct mgc_chunk_gen_mesh_result result = {0};
 
 	for (size_t rchunk_i = 0; rchunk_i < RENDER_CHUNKS_PER_CHUNK; rchunk_i++) {
+		if ((dirty_mask & (1 << rchunk_i)) == 0) {
+			// This chunk is not dirty, just skip it.
+			continue;
+		}
+
 		struct render_chunk_gen_mesh_buffer *rbuffer;
 		rbuffer = &buffer->render_chunks[rchunk_i];
 
@@ -580,6 +585,7 @@ chunk_gen_mesh(struct chunk_gen_mesh_buffer *buffer, struct mgc_material_table *
 			free(vertices);
 
 			result.mesh[rchunk_i] = mesh;
+			result.set[rchunk_i] = true;
 		}
 	}
 

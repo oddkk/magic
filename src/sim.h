@@ -6,6 +6,7 @@
 #include "types.h"
 
 struct mgc_sim_chunk {
+	struct mgc_chunk_cache_entry *cache_entry;
 	struct mgc_chunk_ref neighbours[27];
 };
 

@@ -94,9 +94,10 @@ struct chunk_gen_mesh_buffer {
 
 struct mgc_chunk_gen_mesh_result {
 	struct mgc_mesh mesh[RENDER_CHUNKS_PER_CHUNK];
+	bool set[RENDER_CHUNKS_PER_CHUNK];
 };
 
 struct mgc_chunk_gen_mesh_result
-chunk_gen_mesh(struct chunk_gen_mesh_buffer *buffer, struct mgc_material_table *materials, struct mgc_chunk *cnk);
+chunk_gen_mesh(struct chunk_gen_mesh_buffer *buffer, struct mgc_material_table *materials, struct mgc_chunk *cnk, u64 dirty_mask);
 
 #endif

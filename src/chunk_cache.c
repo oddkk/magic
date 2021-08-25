@@ -191,17 +191,23 @@ mgc_chunk_cache_render_tick(struct mgc_chunk_cache *cache)
 
 			case MGC_CHUNK_CACHE_LOADED:
 			case MGC_CHUNK_CACHE_DIRTY:
+				entry->dirty_mask = UINT64_MAX;
+				// fallthrough
 			case MGC_CHUNK_CACHE_MESHED:
-				{
+				if (entry->dirty_mask) {
 					mgccc_debug_trace(entry->coord, "Meshing...");
 					struct mgc_chunk_gen_mesh_result res = {0};
 					res = chunk_gen_mesh(
-							cache->gen_mesh_buffer,
-							cache->mat_table,
-							entry->chunk
-							);
+						cache->gen_mesh_buffer,
+						cache->mat_table,
+						entry->chunk,
+						entry->dirty_mask
+					);
+					entry->dirty_mask = 0;
 					for (size_t i = 0; i < RENDER_CHUNKS_PER_CHUNK; i++) {
-						entry->mesh[i] = res.mesh[i];
+						if (res.set[i]) {
+							entry->mesh[i] = res.mesh[i];
+						}
 					}
 					entry->state = MGC_CHUNK_CACHE_MESHED;
 					mgccc_debug_trace(entry->coord, "Meshing OK");
