@@ -159,9 +159,6 @@ int main(int argc, char *argv[])
 	atom_table.string_arena = &atom_arena;
 	atom_table_rehash(&atom_table, 64);
 
-	struct chunk_gen_mesh_buffer *mesh_gen_mem;
-	mesh_gen_mem = arena_alloc(&arena, sizeof(struct chunk_gen_mesh_buffer));
-
 	struct mgc_registry reg = {0};
 	mgc_material_table_init(&reg.materials);
 

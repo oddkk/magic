@@ -1,4 +1,5 @@
 #include "chunk_cache.h"
+#include "chunk_mesher.h"
 #include "config.h"
 #include "utils.h"
 #include "world.h"
