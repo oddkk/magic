@@ -1,6 +1,9 @@
 #ifndef MAGIC_SIM_THREAD_H
 #define MAGIC_SIM_THREAD_H
 
+#include "types.h"
+
+struct arena;
 struct mgc_chunk_cache;
 struct mgc_sim_buffer;
 struct mgc_registry;
