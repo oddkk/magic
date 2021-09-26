@@ -6,6 +6,7 @@
 #include "mesh.h"
 #include "arena.h"
 #include "chunk.h"
+#include "chunk_mesher.h"
 
 struct mgc_chunk;
 struct mgc_world;
@@ -32,8 +33,6 @@ struct mgc_chunk_cache_entry {
 	struct mgc_mesh mesh[RENDER_CHUNKS_PER_CHUNK];
 	u64 dirty_mask;
 };
-
-struct chunk_gen_mesh_buffer;
 
 struct mgc_chunk_pool_entry {
 	size_t id;
@@ -104,6 +103,7 @@ struct mgc_chunk_cache {
 	struct mgc_chunk_spatial_index index;
 
 	struct chunk_gen_mesh_buffer *gen_mesh_buffer;
+	struct chunk_gen_mesh_out_buffer gen_mesh_out_buffer;
 	struct mgc_material_table *mat_table;
 
 	struct paged_list chunk_pool;

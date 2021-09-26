@@ -25,11 +25,35 @@ struct render_chunk_gen_mesh_buffer {
 	u8 tileColor[RENDER_CHUNK_NUM_TILES * 3];
 };
 
+struct chunk_gen_mesh {
+	struct chunk_gen_mesh *next;
+	void *data;
+	size_t cap;
+	size_t num_verts;
+};
+
 // Keep the buffers for chunk generating to avoid reallocation.
 struct chunk_gen_mesh_buffer {
 	struct render_chunk_gen_mesh_buffer render_chunks[RENDER_CHUNKS_PER_CHUNK];
 	u8 cullMask[sizeof(u8) * 8*RENDER_CHUNK_NUM_TILES];
 	struct layer_neighbours neighbourMasks[3];
+};
+
+struct chunk_gen_mesh_out_buffer {
+	// TODO: Thread safe
+
+	void *data;
+	size_t cap;
+
+	void *head;
+
+	// The next chunk_gen_mesh is the first that should be popped, and is also
+	// the tail of the cyclic buffer.
+	struct chunk_gen_mesh *next;
+
+	// A reference to the next pointer to the newest chunk_gen_mesh, or
+	// chunk_gen_mesh_out_buffer.next if the queue is empty.
+	struct chunk_gen_mesh **tail;
 };
 
 #undef LAYER_MASK_UNITS
@@ -43,7 +67,10 @@ struct mgc_chunk_gen_mesh_result {
 struct mgc_material_table;
 struct mgc_chunk;
 
+int
+chunk_gen_mesh_buffer_init(struct chunk_gen_mesh_out_buffer *buffer);
+
 struct mgc_chunk_gen_mesh_result
-chunk_gen_mesh(struct chunk_gen_mesh_buffer *buffer, struct mgc_material_table *materials, struct mgc_chunk *cnk, u64 dirty_mask);
+chunk_gen_mesh(struct chunk_gen_mesh_buffer *buffer, struct chunk_gen_mesh_out_buffer *out, struct mgc_material_table *materials, struct mgc_chunk *cnk, u64 dirty_mask);
 
 #endif

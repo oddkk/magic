@@ -38,7 +38,9 @@ mgc_chunk_cache_init(struct mgc_chunk_cache *cache, struct mgc_memory *memory, s
 	cache->mat_table = mat_table;
 	cache->cap_entries = MGC_CHUNK_CACHE_SIZE;
 	cache->entries = calloc(cache->cap_entries, sizeof(struct mgc_chunk_cache_entry));
+
 	cache->gen_mesh_buffer = calloc(1, sizeof(struct chunk_gen_mesh_buffer));
+	chunk_gen_mesh_buffer_init(&cache->gen_mesh_out_buffer);
 
 	paged_list_init(
 		&cache->chunk_pool,
@@ -222,11 +224,12 @@ mgc_chunk_cache_render_tick(struct mgc_chunk_cache *cache)
 						mgccc_debug_trace(entry->coord, "Meshing...");
 						struct mgc_chunk_gen_mesh_result res = {0};
 						res = chunk_gen_mesh(
-								cache->gen_mesh_buffer,
-								cache->mat_table,
-								entry->chunk,
-								entry->dirty_mask
-								);
+							cache->gen_mesh_buffer,
+							&cache->gen_mesh_out_buffer,
+							cache->mat_table,
+							entry->chunk,
+							entry->dirty_mask
+						);
 						entry->dirty_mask = 0;
 						for (size_t i = 0; i < RENDER_CHUNKS_PER_CHUNK; i++) {
 							if (res.set[i]) {

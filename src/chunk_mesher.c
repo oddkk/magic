@@ -96,8 +96,90 @@ count_set_bits_u8(u8 v)
 	return count;
 #endif
 }
+
+struct chunk_gen_mesh *
+chunk_mesh_buffer_alloc(struct chunk_gen_mesh_out_buffer *buffer, size_t data_length)
+{
+	size_t length = sizeof(struct chunk_gen_mesh) + data_length;
+
+	size_t immediate_space;
+	size_t wrapped_space;
+
+	if ((void *)buffer->next > buffer->head) {
+		wrapped_space = 0;
+		immediate_space = (u8 *)buffer->next - (u8 *)buffer->head;
+	} else {
+		immediate_space = ((u8 *)buffer->data + buffer->cap) - (u8 *)buffer->head;
+		wrapped_space = (u8 *)buffer->next - (u8 *)buffer->data;
+	}
+
+	struct chunk_gen_mesh *result = NULL;
+	if (immediate_space > length) {
+		result = buffer->head;
+	} else if (wrapped_space > length) {
+		result = buffer->data;
+	}
+
+	if (!result) {
+		return NULL;
+	}
+
+	assert(((u8 *)result+length) < ((u8 *)buffer->data+buffer->cap));
+
+	memset(result, 0, length);
+
+	result->cap = data_length;
+	result->data = (u8 *)result + sizeof(struct chunk_gen_mesh);
+	buffer->head = (u8 *)result + length;
+
+	if (!buffer->tail) {
+		assert(buffer->next == NULL);
+		buffer->tail = &buffer->next;
+	}
+
+	*buffer->tail = result;
+
+	printf("alloc %p (%zu) (+%zu, %zi remaining)\n",
+		(void *)result,
+		length,
+		(u8 *)result - (u8 *)buffer->data,
+		(ssize_t)buffer->cap - (ssize_t)((u8 *)buffer->head - (u8 *)buffer->data)
+	);
+
+	return result;
+}
+
+struct chunk_gen_mesh *
+chunk_mesh_buffer_pop(struct chunk_gen_mesh_out_buffer *buffer)
+{
+	struct chunk_gen_mesh *res = buffer->next;
+	if (!res) {
+		return NULL;
+	}
+	buffer->next = res->next;
+	if (!buffer->next) {
+		buffer->tail = &buffer->next;
+	}
+
+	return res;
+}
+
+int
+chunk_gen_mesh_buffer_init(struct chunk_gen_mesh_out_buffer *buffer)
+{
+	buffer->cap = 10 * 1000 * 1000;
+	buffer->data = calloc(sizeof(u8), buffer->cap); // 10MB
+	if (!buffer->data) {
+		return -1;
+	}
+
+	buffer->head = buffer->data;
+	buffer->tail = &buffer->next;
+	return 0;
+}
+
 struct mgc_chunk_gen_mesh_result
-chunk_gen_mesh(struct chunk_gen_mesh_buffer *buffer, struct mgc_material_table *materials, struct mgc_chunk *cnk, u64 dirty_mask)
+chunk_gen_mesh(struct chunk_gen_mesh_buffer *buffer, struct chunk_gen_mesh_out_buffer *out, struct mgc_material_table *materials, struct mgc_chunk *cnk, u64 dirty_mask)
 {
 	TracyCZone(trace, true);
 
@@ -268,7 +350,16 @@ chunk_gen_mesh(struct chunk_gen_mesh_buffer *buffer, struct mgc_material_table *
 
 			// position, normal, and color per vertex.
 			const size_t vertexStride = sizeof(v3)*2 + sizeof(u8)*3;
-			u8 *vertices = calloc(vertexStride, 3 * numTriangles);
+			struct chunk_gen_mesh *mesh_result;
+			mesh_result = chunk_mesh_buffer_alloc(out, vertexStride * 3 * numTriangles);
+
+			if (!mesh_result) {
+				// TODO: Handle error here.
+				printf("We ran out of chunk gen mesh buffer space. TODO: Handle this scenario.\n");
+				break;
+			}
+
+			u8 *vertices = mesh_result->data;
 
 			size_t vertI = 0;
 			for (size_t i = 0; i < RENDER_CHUNK_NUM_TILES; i++) {
@@ -390,8 +481,6 @@ chunk_gen_mesh(struct chunk_gen_mesh_buffer *buffer, struct mgc_material_table *
 
 			glBindVertexArray(0);
 			glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-			free(vertices);
 
 			result.mesh[rchunk_i] = mesh;
 			result.set[rchunk_i] = true;
