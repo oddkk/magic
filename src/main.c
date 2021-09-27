@@ -272,6 +272,7 @@ int main(int argc, char *argv[])
 	signal(SIGINT, signalHandler);
 	while (!glfwWindowShouldClose(win) && !shouldQuit) {
 		tick += 1;
+		// printf("==================== frame start ====================\n");
 
 		if (!mouse_control_enabled && win_ctx.enable_mouse_input) {
 			glfwSetInputMode(win, GLFW_CURSOR, GLFW_CURSOR_DISABLED);

@@ -30,13 +30,16 @@ mgc_sim_thread_fn(struct mgc_sim_thread *thread, size_t id)
 	size_t tick = 0;
 	while (!thread->should_quit) {
 		if (thread->chunk_cache->update_state == MGC_CHUNK_CACHE_UPDATE_SIM) {
-
-			// mgc_sim_tick(sim_buffer, &chunk_cache, &reg, sim_tick);
 			mgc_sim_tick(
 				thread->sim_buffer,
 				thread->chunk_cache,
 				thread->registry,
 				tick
+			);
+
+			// TODO: Re-run meshing in case we ran out of buffer-space last tick.
+			mgc_chunk_cache_mesh(
+				thread->chunk_cache
 			);
 			tick += 1;
 

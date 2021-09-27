@@ -138,13 +138,39 @@ chunk_mesh_buffer_alloc(struct chunk_gen_mesh_out_buffer *buffer, size_t data_le
 	}
 
 	*buffer->tail = result;
+	buffer->tail = &result->next;
 
+#if 0
+	int p_begin = ((size_t)((u8 *)result->data - (u8 *)buffer->data         ) * 50UL) / (size_t)buffer->cap;
+	int p_end   = ((size_t)((u8 *)result->data - (u8 *)buffer->data + length) * 50UL) / (size_t)buffer->cap;
+	int p_next  = ((size_t)((u8 *)buffer->next - (u8 *)buffer->data         ) * 50UL) / (size_t)buffer->cap;
+
+	if (p_begin > 50) p_begin = 50;
+	if (p_begin < 0)  p_begin = 0;
+
+	if (p_end > 50) p_end = 50;
+	if (p_end < p_begin)  p_end = p_begin+1;
+
+	if (p_next > 50) p_next = 50;
+	if (p_next < 0)  p_next = 0;
+
+	const char *progress_content = "##################################################";
+
+	printf("[%*.*s%*.0s]\n",
+		p_end, p_end - p_begin, progress_content,
+		50 - p_end, ""
+	);
+	printf("[%*.1s%*.0s]",
+		p_next, "|",
+		50 - p_next, ""
+	);
 	printf("alloc %p (%zu) (+%zu, %zi remaining)\n",
 		(void *)result,
 		length,
 		(u8 *)result - (u8 *)buffer->data,
 		(ssize_t)buffer->cap - (ssize_t)((u8 *)buffer->head - (u8 *)buffer->data)
 	);
+#endif
 
 	return result;
 }
@@ -167,7 +193,7 @@ chunk_mesh_buffer_pop(struct chunk_gen_mesh_out_buffer *buffer)
 int
 chunk_gen_mesh_buffer_init(struct chunk_gen_mesh_out_buffer *buffer)
 {
-	buffer->cap = 10 * 1000 * 1000;
+	buffer->cap = 50 * 1000 * 1000;
 	buffer->data = calloc(sizeof(u8), buffer->cap); // 10MB
 	if (!buffer->data) {
 		return -1;
@@ -228,7 +254,7 @@ chunk_gen_mesh(struct chunk_gen_mesh_buffer *buffer, struct chunk_gen_mesh_out_b
 	struct mgc_chunk_gen_mesh_result result = {0};
 
 	for (size_t rchunk_i = 0; rchunk_i < RENDER_CHUNKS_PER_CHUNK; rchunk_i++) {
-		if ((dirty_mask & (1 << rchunk_i)) == 0) {
+		if ((dirty_mask & (1UL << rchunk_i)) == 0) {
 			// This chunk is not dirty, just skip it.
 			continue;
 		}
@@ -349,7 +375,9 @@ chunk_gen_mesh(struct chunk_gen_mesh_buffer *buffer, struct chunk_gen_mesh_out_b
 			};
 
 			// position, normal, and color per vertex.
-			const size_t vertexStride = sizeof(v3)*2 + sizeof(u8)*3;
+			// Add 1 for alignment
+			const size_t vertexStride = sizeof(v3)*2 + sizeof(u8)*3+1;
+			assert(vertexStride == 28);
 			struct chunk_gen_mesh *mesh_result;
 			mesh_result = chunk_mesh_buffer_alloc(out, vertexStride * 3 * numTriangles);
 
@@ -456,37 +484,93 @@ chunk_gen_mesh(struct chunk_gen_mesh_buffer *buffer, struct chunk_gen_mesh_out_b
 
 #undef EMIT_HEX_TRIANGLE
 
-			struct mgc_mesh mesh = {0};
-
-			mesh.numVertices = vertI;
-
-			glGenVertexArrays(1, &mesh.vao);
-			glGenBuffers(1, &mesh.vbo);
-
-			glBindVertexArray(mesh.vao);
-			glBindBuffer(GL_ARRAY_BUFFER, mesh.vbo);
-
-			glBufferData(GL_ARRAY_BUFFER, numTriangles * 3*vertexStride, vertices, GL_STATIC_DRAW);
-
-			// Position
-			glVertexAttribPointer(0, 3, GL_FLOAT,         GL_FALSE, vertexStride, 0);
-			// Normal
-			glVertexAttribPointer(1, 3, GL_FLOAT,         GL_FALSE, vertexStride, (void*)(sizeof(v3)));
-			// Colour
-			glVertexAttribPointer(2, 3, GL_UNSIGNED_BYTE, GL_TRUE,  vertexStride, (void*)(sizeof(v3)*2));
-
-			glEnableVertexAttribArray(0);
-			glEnableVertexAttribArray(1);
-			glEnableVertexAttribArray(2);
-
-			glBindVertexArray(0);
-			glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-			result.mesh[rchunk_i] = mesh;
+			mesh_result->num_verts = numTriangles * 3;
+			mesh_result->chunk = cnk->location;
+			mesh_result->render_chunk_idx = rchunk_i;
+			result.buffer[rchunk_i] = mesh_result;
 			result.set[rchunk_i] = true;
 		}
 	}
 
 	TracyCZoneEnd(trace);
 	return result;
+}
+
+void
+mgc_chunk_vbo_pool_init(struct mgc_chunk_vbo_pool *pool,
+		struct mgc_chunk_vbo_pool_entry *mem, size_t cap)
+{
+	pool->entries = mem;
+	pool->cap_entries = cap;
+	pool->free_list = pool->entries;
+
+	memset(pool->entries, 0, pool->cap_entries * sizeof(struct mgc_chunk_vbo_pool_entry));
+	// Exclude the last entry to leave its free_list_next it at NULL.
+	for (size_t i = 0; i < pool->cap_entries-1; i++) {
+		pool->entries[i].free_list_next = &pool->entries[i+1];
+	}
+}
+
+struct mgc_chunk_vbo_pool_entry *
+mgc_chunk_vbo_pool_alloc(struct mgc_chunk_vbo_pool *pool, u8 *data, size_t num_vertices)
+{
+	struct mgc_chunk_vbo_pool_entry *entry;
+	entry = pool->free_list;
+	if (!entry) {
+		printf("out of vbos\n");
+		return NULL;
+	}
+	pool->free_list = entry->free_list_next;
+	entry->free_list_next = NULL;
+
+	struct mgc_mesh *mesh = &entry->mesh;
+
+	// Add 1 for alignment
+	const size_t vertex_stride = sizeof(v3)*2 + sizeof(u8)*3+1;
+	assert(vertex_stride == 28);
+	size_t buffer_size = num_vertices * vertex_stride;
+
+	mesh->numVertices = num_vertices;
+
+	if (!entry->initialized) {
+		glGenVertexArrays(1, &mesh->vao);
+		glGenBuffers(1, &mesh->vbo);
+	}
+
+	glBindVertexArray(mesh->vao);
+	glBindBuffer(GL_ARRAY_BUFFER, mesh->vbo);
+
+	if (entry->buffer_size < buffer_size) {
+		glBufferData(GL_ARRAY_BUFFER, buffer_size, data, GL_STATIC_DRAW);
+		entry->buffer_size = buffer_size;
+	} else {
+		glBufferSubData(GL_ARRAY_BUFFER, 0, buffer_size, data);
+	}
+
+	if (!entry->initialized) {
+		// Position
+		glVertexAttribPointer(0, 3, GL_FLOAT,         GL_FALSE, vertex_stride, 0);
+		// Normal
+		glVertexAttribPointer(1, 3, GL_FLOAT,         GL_FALSE, vertex_stride, (void*)(sizeof(v3)));
+		// Colour
+		glVertexAttribPointer(2, 3, GL_UNSIGNED_BYTE, GL_TRUE,  vertex_stride, (void*)(sizeof(v3)*2));
+
+		glEnableVertexAttribArray(0);
+		glEnableVertexAttribArray(1);
+		glEnableVertexAttribArray(2);
+	}
+
+	glBindVertexArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+	entry->initialized = true;
+
+	return entry;
+}
+
+void
+mgc_chunk_vbo_pool_release(struct mgc_chunk_vbo_pool *pool, struct mgc_chunk_vbo_pool_entry *entry)
+{
+	entry->free_list_next = pool->free_list;
+	pool->free_list = entry;
 }

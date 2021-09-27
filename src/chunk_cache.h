@@ -30,7 +30,8 @@ struct mgc_chunk_cache_entry {
 	enum mgc_chunk_cache_entry_state state;
 	v3i coord;
 	struct mgc_chunk *chunk;
-	struct mgc_mesh mesh[RENDER_CHUNKS_PER_CHUNK];
+	// struct mgc_mesh mesh[RENDER_CHUNKS_PER_CHUNK];
+	struct mgc_chunk_vbo_pool_entry *mesh[RENDER_CHUNKS_PER_CHUNK];
 	u64 dirty_mask;
 };
 
@@ -109,6 +110,8 @@ struct mgc_chunk_cache {
 	struct paged_list chunk_pool;
 	struct mgc_chunk_pool_entry *chunk_pool_free_list;
 
+	struct mgc_chunk_vbo_pool vbo_pool;
+
 	struct mgc_world *world;
 };
 
@@ -127,6 +130,9 @@ mgc_chunk_cache_invalidate(struct mgc_chunk_cache *, v3i coord);
 
 void
 mgc_chunk_cache_tick(struct mgc_chunk_cache *cache);
+
+void
+mgc_chunk_cache_mesh(struct mgc_chunk_cache *cache);
 
 void
 mgc_chunk_cache_render_tick(struct mgc_chunk_cache *cache);

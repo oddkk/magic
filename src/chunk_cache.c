@@ -49,6 +49,11 @@ mgc_chunk_cache_init(struct mgc_chunk_cache *cache, struct mgc_memory *memory, s
 	);
 
 	mgc_chunk_spatial_index_init(&cache->index, memory);
+
+	size_t vbo_pool_mem_cap = 512;
+	struct mgc_chunk_vbo_pool_entry *vbo_pool_mem;
+	vbo_pool_mem = calloc(sizeof(struct mgc_chunk_vbo_pool_entry), vbo_pool_mem_cap);
+	mgc_chunk_vbo_pool_init(&cache->vbo_pool, vbo_pool_mem, vbo_pool_mem_cap);
 }
 
 static struct mgc_chunk *
@@ -201,46 +206,79 @@ mgc_chunk_cache_tick(struct mgc_chunk_cache *cache)
 }
 
 void
+mgc_chunk_cache_mesh(struct mgc_chunk_cache *cache)
+{
+	TracyCZone(trace, true);
+
+	for (size_t entry_i = 0; entry_i < cache->head; entry_i++) {
+		struct mgc_chunk_cache_entry *entry = &cache->entries[entry_i];
+
+		switch (entry->state) {
+			case MGC_CHUNK_CACHE_UNUSED:
+			case MGC_CHUNK_CACHE_UNLOADED:
+			case MGC_CHUNK_CACHE_FAILED:
+				break;
+
+			case MGC_CHUNK_CACHE_LOADED:
+			case MGC_CHUNK_CACHE_DIRTY:
+				entry->dirty_mask = UINT64_MAX;
+				// fallthrough
+			case MGC_CHUNK_CACHE_MESHED:
+				if (entry->dirty_mask) {
+					mgccc_debug_trace(entry->coord, "Meshing...");
+					struct mgc_chunk_gen_mesh_result res = {0};
+					res = chunk_gen_mesh(
+						cache->gen_mesh_buffer,
+						&cache->gen_mesh_out_buffer,
+						cache->mat_table,
+						entry->chunk,
+						entry->dirty_mask
+					);
+
+					if (res.err > 0) {
+						mgccc_debug_trace(entry->coord, "Meshing YIELDED");
+						break;
+					} else if (res.err < 0) {
+						mgccc_debug_trace(entry->coord, "Meshing FAILED");
+						entry->state = MGC_CHUNK_CACHE_FAILED;
+						continue;
+					}
+
+					entry->state = MGC_CHUNK_CACHE_MESHED;
+					mgccc_debug_trace(entry->coord, "Meshing OK");
+					// fallthrough
+				}
+				break;
+		}
+	}
+
+	TracyCZoneEnd(trace);
+}
+
+void
 mgc_chunk_cache_render_tick(struct mgc_chunk_cache *cache)
 {
 	if (cache->update_state == MGC_CHUNK_CACHE_UPDATE_RENDER) {
 		TracyCZone(trace, true);
 
-		for (size_t entry_i = 0; entry_i < cache->head; entry_i++) {
-			struct mgc_chunk_cache_entry *entry = &cache->entries[entry_i];
+		struct chunk_gen_mesh *mesh;
+		while ((mesh = chunk_mesh_buffer_pop(&cache->gen_mesh_out_buffer)) != NULL) {
+			isize chunk_idx = mgc_chunk_cache_find(cache, mesh->chunk);
+			struct mgc_chunk_cache_entry *entry;
+			entry = &cache->entries[chunk_idx];
+			size_t rchunk_idx = mesh->render_chunk_idx;
 
-			switch (entry->state) {
-				case MGC_CHUNK_CACHE_UNUSED:
-				case MGC_CHUNK_CACHE_UNLOADED:
-				case MGC_CHUNK_CACHE_FAILED:
-					break;
+			struct mgc_chunk_vbo_pool_entry *old_vbo;
+			old_vbo = entry->mesh[rchunk_idx];
+			entry->mesh[rchunk_idx] = mgc_chunk_vbo_pool_alloc(
+				&cache->vbo_pool,
+				mesh->data,
+				mesh->num_verts
+			);
+			entry->dirty_mask &= ~(1UL << rchunk_idx);
 
-				case MGC_CHUNK_CACHE_LOADED:
-				case MGC_CHUNK_CACHE_DIRTY:
-					entry->dirty_mask = UINT64_MAX;
-					// fallthrough
-				case MGC_CHUNK_CACHE_MESHED:
-					if (entry->dirty_mask) {
-						mgccc_debug_trace(entry->coord, "Meshing...");
-						struct mgc_chunk_gen_mesh_result res = {0};
-						res = chunk_gen_mesh(
-							cache->gen_mesh_buffer,
-							&cache->gen_mesh_out_buffer,
-							cache->mat_table,
-							entry->chunk,
-							entry->dirty_mask
-						);
-						entry->dirty_mask = 0;
-						for (size_t i = 0; i < RENDER_CHUNKS_PER_CHUNK; i++) {
-							if (res.set[i]) {
-								entry->mesh[i] = res.mesh[i];
-							}
-						}
-						entry->state = MGC_CHUNK_CACHE_MESHED;
-						mgccc_debug_trace(entry->coord, "Meshing OK");
-						// fallthrough
-					}
-					break;
+			if (old_vbo) {
+				mgc_chunk_vbo_pool_release(&cache->vbo_pool, old_vbo);
 			}
 		}
 
@@ -268,7 +306,7 @@ mgc_chunk_cache_make_render_queue(
 		if (entry->state == MGC_CHUNK_CACHE_MESHED ||
 			entry->state == MGC_CHUNK_CACHE_DIRTY) {
 			for (size_t rchunk_i = 0; rchunk_i < RENDER_CHUNKS_PER_CHUNK; rchunk_i++) {
-				if (entry->mesh[rchunk_i].numVertices > 0) {
+				if (entry->mesh[rchunk_i] && entry->mesh[rchunk_i]->mesh.numVertices > 0) {
 					v3i chunk_offset = V3i(
 						entry->coord.x * CHUNK_WIDTH,
 						entry->coord.y * CHUNK_WIDTH,
@@ -284,7 +322,7 @@ mgc_chunk_cache_make_render_queue(
 					struct mgc_chunk_render_entry *render_entry;
 					render_entry = &queue[*queue_head];
 
-					render_entry->mesh = entry->mesh[rchunk_i];
+					render_entry->mesh = entry->mesh[rchunk_i]->mesh;
 					render_entry->coord = v3i_add(chunk_offset, rchunk_offset);
 
 					*queue_head += 1;
