@@ -351,6 +351,13 @@ chunk_gen_mesh(struct chunk_gen_mesh_buffer *buffer, struct chunk_gen_mesh_out_b
 			numTriangles += count_set_bits_u8(hexFaces)       * 2;
 		}
 
+		// position, normal, and color per vertex.
+		// Add 1 for alignment
+		const size_t vertexStride = sizeof(v3)*2 + sizeof(u8)*3+1;
+		assert(vertexStride == 28);
+		struct chunk_gen_mesh *mesh_result;
+		mesh_result = chunk_mesh_buffer_alloc(out, vertexStride * 3 * numTriangles);
+
 		if (numTriangles > 0) {
 			const f32 normalX = sin(30.0 * PI / 180.0);
 			const f32 normalY = cos(30.0 * PI / 180.0);
@@ -373,13 +380,6 @@ chunk_gen_mesh(struct chunk_gen_mesh_buffer *buffer, struct chunk_gen_mesh_out_b
 				V3(-xOffset, 0.0f, -yOffset),
 				V3(-xOffset, 0.0f,  yOffset),
 			};
-
-			// position, normal, and color per vertex.
-			// Add 1 for alignment
-			const size_t vertexStride = sizeof(v3)*2 + sizeof(u8)*3+1;
-			assert(vertexStride == 28);
-			struct chunk_gen_mesh *mesh_result;
-			mesh_result = chunk_mesh_buffer_alloc(out, vertexStride * 3 * numTriangles);
 
 			if (!mesh_result) {
 				// TODO: Handle error here.
@@ -483,13 +483,13 @@ chunk_gen_mesh(struct chunk_gen_mesh_buffer *buffer, struct chunk_gen_mesh_out_b
 			assert(vertI == vertexStride * 3 * numTriangles);
 
 #undef EMIT_HEX_TRIANGLE
-
-			mesh_result->num_verts = numTriangles * 3;
-			mesh_result->chunk = cnk->location;
-			mesh_result->render_chunk_idx = rchunk_i;
-			result.buffer[rchunk_i] = mesh_result;
 			result.set[rchunk_i] = true;
 		}
+
+		mesh_result->num_verts = numTriangles * 3;
+		mesh_result->chunk = cnk->location;
+		mesh_result->render_chunk_idx = rchunk_i;
+		result.buffer[rchunk_i] = mesh_result;
 	}
 
 	TracyCZoneEnd(trace);

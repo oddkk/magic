@@ -244,6 +244,7 @@ mgc_chunk_cache_mesh(struct mgc_chunk_cache *cache)
 						continue;
 					}
 
+					entry->dirty_mask = 0;
 					entry->state = MGC_CHUNK_CACHE_MESHED;
 					mgccc_debug_trace(entry->coord, "Meshing OK");
 					// fallthrough
@@ -270,12 +271,16 @@ mgc_chunk_cache_render_tick(struct mgc_chunk_cache *cache)
 
 			struct mgc_chunk_vbo_pool_entry *old_vbo;
 			old_vbo = entry->mesh[rchunk_idx];
-			entry->mesh[rchunk_idx] = mgc_chunk_vbo_pool_alloc(
-				&cache->vbo_pool,
-				mesh->data,
-				mesh->num_verts
-			);
-			entry->dirty_mask &= ~(1UL << rchunk_idx);
+
+			if (mesh->num_verts > 0) {
+				entry->mesh[rchunk_idx] = mgc_chunk_vbo_pool_alloc(
+					&cache->vbo_pool,
+					mesh->data,
+					mesh->num_verts
+				);
+			} else {
+				entry->mesh[rchunk_idx] = NULL;
+			}
 
 			if (old_vbo) {
 				mgc_chunk_vbo_pool_release(&cache->vbo_pool, old_vbo);

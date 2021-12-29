@@ -349,7 +349,6 @@ int main(int argc, char *argv[])
 			mgc_chunk_cache_tick(&chunk_cache);
 		}
 
-
 		mgc_chunk_cache_render_tick(&chunk_cache);
 
 		size_t render_queue_length = 0;
